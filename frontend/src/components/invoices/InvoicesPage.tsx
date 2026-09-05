@@ -4,9 +4,10 @@ import React, { useMemo, useState } from "react";
 import { AppSidebar } from "@/components/AppSidebar";
 import { TopHeader } from "@/components/TopHeader";
 import { invoiceLineItems, invoices as initialInvoices, invoiceStats, invoiceTimeline } from "./mockData";
+import { formatCurrency } from "@/lib/currency";
 import type { CreditNote, DateRange, Invoice, InvoiceLineItem, InvoiceStatus, InvoiceType, PaymentMethod } from "./types";
 
-const money = (value: number, digits = 0) => `$${value.toLocaleString("en-US", { minimumFractionDigits: digits, maximumFractionDigits: digits })}`;
+const money = (value: number, digits = 0) => formatCurrency(value, "INR", { minimumFractionDigits: digits, maximumFractionDigits: digits });
 const card = "bg-white border border-[#E5E7EB] rounded-lg shadow-[0px_1px_2px_rgba(15,23,42,0.04)]";
 const successBadge = "inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-label-sm font-semibold bg-[#ECFDF5] text-[#065F46] border border-[#A7F3D0]";
 const infoBadge = "inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-label-sm font-semibold bg-[#EFF6FF] text-[#1E40AF] border border-[#BFDBFE]";
@@ -28,10 +29,10 @@ export function InvoicesPage() {
   const [statusFilter, setStatusFilter] = useState<"All" | InvoiceStatus>("All");
   const [typeFilter, setTypeFilter] = useState<"All" | InvoiceType>("All");
   const [dateFilter, setDateFilter] = useState<"All" | DateRange>("All");
-  const [paymentAmount, setPaymentAmount] = useState("5390");
+  const [paymentAmount, setPaymentAmount] = useState("578200");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("Bank Transfer");
   const [creditReason, setCreditReason] = useState("Cancellation");
-  const [creditAmount, setCreditAmount] = useState("500");
+  const [creditAmount, setCreditAmount] = useState("50000");
   const [creditNotes, setCreditNotes] = useState<CreditNote[]>([]);
   const [message, setMessage] = useState("");
   const [dialog, setDialog] = useState<"payment" | "credit" | "preview" | "export" | null>(null);
@@ -164,7 +165,7 @@ function InvoiceLineItems({ invoice, items }: { invoice: Invoice; items: Invoice
   return <section className={`${card} overflow-hidden`}>
     <SectionBar title="Invoice Items" subtitle={invoice.id} icon="list_alt" />
     <div className="overflow-x-auto"><table className="w-full min-w-[520px] text-left"><thead><tr className="bg-[#F8F9FA] border-b border-[#E5E7EB] h-9 font-label-sm text-label-sm text-[#475569] uppercase tracking-wider"><th className="py-2.5 px-space-base">Item</th><th className="py-2.5 px-space-md">Qty</th><th className="py-2.5 px-space-md text-right">Unit Price</th><th className="py-2.5 px-space-base text-right">Amount</th></tr></thead><tbody className="divide-y divide-[#F1F5F9] font-body-md text-body-md">{items.map((item) => <tr key={`${item.invoiceId}-${item.description}`}><td className="py-2.5 px-space-base"><span className="font-semibold text-on-surface">{item.description}</span>{item.billing && <span className="block font-body-sm text-[11px] text-outline">Billing: {item.billing}</span>}</td><td className="py-2.5 px-space-md text-on-surface-variant">{item.quantity}</td><td className="py-2.5 px-space-md text-right font-code-tabular tnum">{money(item.unitPrice)}</td><td className="py-2.5 px-space-base text-right font-code-tabular tnum font-semibold text-on-surface">{money(item.amount)}</td></tr>)}</tbody></table></div>
-    <div className="px-space-base py-space-sm bg-[#F8F9FA] border-t border-[#E5E7EB] space-y-1 font-body-sm text-body-sm"><AmountRow label="Subtotal" value={invoice.subtotal} /><AmountRow label="Tax" value={invoice.tax} /><AmountRow label="Total" value={invoice.total} strong /><AmountRow label="Balance Due" value={invoice.balanceDue} strong /></div>
+    <div className="px-space-base py-space-sm bg-[#F8F9FA] border-t border-[#E5E7EB] space-y-1 font-body-sm text-body-sm"><AmountRow label="Subtotal" value={invoice.subtotal} /><AmountRow label="GST" value={invoice.tax} /><AmountRow label="Total" value={invoice.total} strong /><AmountRow label="Balance Due" value={invoice.balanceDue} strong /></div>
   </section>;
 }
 
@@ -206,7 +207,7 @@ function CreditNoteDialog({ invoice, reason, amount, onReason, onAmount, onClose
 
 function InvoicePreviewDialog({ invoice, items, creditNotes, onClose }: { invoice: Invoice; items: InvoiceLineItem[]; creditNotes: CreditNote[]; onClose: () => void }) {
   const creditTotal = creditNotes.reduce((sum, note) => sum + note.amount, 0);
-  return <Dialog title={`Invoice Preview ${invoice.id}`} onClose={onClose}><div className="border border-[#E5E7EB] rounded-lg p-space-base bg-white"><div className="flex justify-between border-b border-[#E5E7EB] pb-space-sm mb-space-sm"><div><h3 className="font-headline-sm text-title-lg font-bold text-primary">DealFlow360</h3><p className="font-body-sm text-body-sm text-outline">Bill To: {invoice.customer}</p></div><div className="text-right"><span className="block font-code-tabular font-bold text-on-surface">{invoice.id}</span><span className="block font-body-sm text-outline">{invoice.invoiceDate}</span><span className="block font-body-sm text-outline">Due {invoice.dueDate}</span><span className="block font-body-sm text-outline">{invoice.paymentTerms}</span></div></div><div className="divide-y divide-[#F1F5F9]">{items.map((item) => <div key={item.description} className="grid grid-cols-[1fr_90px] py-2 font-body-sm text-body-sm"><span>{item.description}<span className="block text-outline">{item.quantity}{item.billing ? ` - ${item.billing}` : ""}</span></span><span className="text-right font-code-tabular tnum font-semibold">{money(item.amount)}</span></div>)}</div><div className="pt-space-sm border-t border-[#E5E7EB] mt-space-sm space-y-1"><AmountRow label="Subtotal" value={invoice.subtotal} /><AmountRow label="Tax" value={invoice.tax} /><AmountRow label="Total" value={invoice.total} strong />{creditTotal > 0 && <AmountRow label="Credit Notes" value={-creditTotal} />}<AmountRow label="Balance Due" value={invoice.balanceDue} strong /></div></div></Dialog>;
+  return <Dialog title={`Invoice Preview ${invoice.id}`} onClose={onClose}><div className="border border-[#E5E7EB] rounded-lg p-space-base bg-white"><div className="flex justify-between border-b border-[#E5E7EB] pb-space-sm mb-space-sm"><div><h3 className="font-headline-sm text-title-lg font-bold text-primary">DealFlow360</h3><p className="font-body-sm text-body-sm text-outline">Bill To: {invoice.customer}</p></div><div className="text-right"><span className="block font-code-tabular font-bold text-on-surface">{invoice.id}</span><span className="block font-body-sm text-outline">{invoice.invoiceDate}</span><span className="block font-body-sm text-outline">Due {invoice.dueDate}</span><span className="block font-body-sm text-outline">{invoice.paymentTerms}</span></div></div><div className="divide-y divide-[#F1F5F9]">{items.map((item) => <div key={item.description} className="grid grid-cols-[1fr_90px] py-2 font-body-sm text-body-sm"><span>{item.description}<span className="block text-outline">{item.quantity}{item.billing ? ` - ${item.billing}` : ""}</span></span><span className="text-right font-code-tabular tnum font-semibold">{money(item.amount)}</span></div>)}</div><div className="pt-space-sm border-t border-[#E5E7EB] mt-space-sm space-y-1"><AmountRow label="Subtotal" value={invoice.subtotal} /><AmountRow label="GST" value={invoice.tax} /><AmountRow label="Total" value={invoice.total} strong />{creditTotal > 0 && <AmountRow label="Credit Notes" value={-creditTotal} />}<AmountRow label="Balance Due" value={invoice.balanceDue} strong /></div></div></Dialog>;
 }
 
 function PlaceholderDialog({ title, invoice, onClose }: { title: string; invoice: Invoice; onClose: () => void }) {

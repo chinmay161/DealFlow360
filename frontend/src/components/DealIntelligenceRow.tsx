@@ -2,6 +2,7 @@
 
 import React from "react";
 import { SerializedQuoteLineItem, SerializedApproval } from "@/lib/quotations";
+import { formatCurrency } from "@/lib/currency";
 
 interface DealIntelligenceRowProps {
   currency?: string;
@@ -15,21 +16,12 @@ interface DealIntelligenceRowProps {
   approvals?: SerializedApproval[];
 }
 
-function formatCurrency(amount: number, currency = "USD"): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: currency,
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(amount);
-}
-
 export const DealIntelligenceRow: React.FC<DealIntelligenceRowProps> = ({
-  currency = "USD",
-  subtotal = 20250,
-  discountTotal = 3420,
-  taxTotal = 1470,
-  totalValue = 18300,
+  currency = "INR",
+  subtotal = 2025000,
+  discountTotal = 342000,
+  taxTotal = 147000,
+  totalValue = 1830000,
   estimatedMargin = 36,
   riskScore = 72,
   lineItems = [],
@@ -40,7 +32,7 @@ export const DealIntelligenceRow: React.FC<DealIntelligenceRowProps> = ({
   const isMediumRisk = currentRisk >= 40 && currentRisk < 70;
 
   const blendedDiscountPercent = subtotal > 0 ? (discountTotal / subtotal) * 100 : 0;
-  const grossMarginDollar = totalValue * (estimatedMargin / 100);
+  const grossMarginAmount = totalValue * (estimatedMargin / 100);
   const totalUnits = lineItems.reduce((acc, item) => acc + item.quantity, 0);
 
   // Derive workflow steps from database approval relation
@@ -68,7 +60,7 @@ export const DealIntelligenceRow: React.FC<DealIntelligenceRowProps> = ({
                 Financial Summary
               </span>
             </div>
-            <span className="text-[11px] font-label-sm text-outline">{currency} ($)</span>
+            <span className="text-[11px] font-label-sm text-outline">{currency} (₹)</span>
           </div>
 
           <div className="space-y-2.5 font-body-sm text-body-sm">
@@ -90,7 +82,7 @@ export const DealIntelligenceRow: React.FC<DealIntelligenceRowProps> = ({
               </span>
             </div>
             <div className="flex items-center justify-between text-on-surface-variant">
-              <span>Estimated Tax (State &amp; Fed)</span>
+              <span>Estimated GST (18%)</span>
               <span className="font-code-tabular tnum text-on-surface font-medium">
                 {formatCurrency(taxTotal, currency)}
               </span>
@@ -113,7 +105,7 @@ export const DealIntelligenceRow: React.FC<DealIntelligenceRowProps> = ({
                 Est. Margin
               </span>
               <span className="font-title-md text-title-md font-bold text-[#065F46] tnum">
-                {formatCurrency(grossMarginDollar, currency)}
+                {formatCurrency(grossMarginAmount, currency)}
               </span>
               <span className="block text-[11px] font-label-sm text-outline">
                 {Math.round(estimatedMargin)}% gross margin

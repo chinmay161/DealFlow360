@@ -8,13 +8,23 @@ import { ActionRequiredPanel } from "@/components/dashboard/ActionRequiredPanel"
 import { DealHealthPanel } from "@/components/dashboard/DealHealthPanel";
 import { PipelinePerformance } from "@/components/dashboard/PipelinePerformance";
 import { RecentActivityFeed } from "@/components/dashboard/RecentActivityFeed";
+import { getDashboardMetrics } from "@/lib/services/dashboardService";
+
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "DealFlow360 - Dashboard | Operational Command Center",
   description: "Monitor active deals, approvals, revenue, and operational activity in DealFlow360",
 };
 
-export default function DashboardPage() {
+export default async function DashboardPage() {
+  let metrics = null;
+  try {
+    metrics = await getDashboardMetrics();
+  } catch (err) {
+    console.error("Failed to load dashboard metrics:", err);
+  }
+
   return (
     <>
       {/* LEFT PERSISTENT SIDEBAR (260px) */}
@@ -30,25 +40,25 @@ export default function DashboardPage() {
           {/* SCROLLABLE WORKSPACE */}
           <div className="flex-1 overflow-y-auto px-space-xl py-space-lg space-y-space-base pb-16">
             <DashboardHeader />
-            <KpiRow />
+            <KpiRow kpi={metrics?.kpi} />
 
             {/* TWO-COLUMN WORKSPACE: LEFT ~67%, RIGHT ~33% */}
             <div className="grid grid-cols-12 gap-space-base items-start">
               {/* LEFT COLUMN: ACTIVE DEALS & PIPELINE PERFORMANCE */}
               <div className="col-span-8 space-y-space-base">
-                <ActiveDealsTable />
+                <ActiveDealsTable deals={metrics?.activeDeals} />
                 <PipelinePerformance />
               </div>
 
               {/* RIGHT COLUMN: ACTION REQUIRED & DEAL HEALTH */}
               <div className="col-span-4 space-y-space-base">
-                <ActionRequiredPanel />
-                <DealHealthPanel />
+                <ActionRequiredPanel items={metrics?.actionRequired} />
+                <DealHealthPanel dealHealth={metrics?.dealHealth} />
               </div>
             </div>
 
             {/* BOTTOM SECTION: RECENT ACTIVITY */}
-            <RecentActivityFeed />
+            <RecentActivityFeed activities={metrics?.recentActivity} />
           </div>
         </main>
       </div>

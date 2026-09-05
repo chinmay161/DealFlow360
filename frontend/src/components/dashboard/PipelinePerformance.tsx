@@ -10,11 +10,11 @@ interface PipelineStage {
 }
 
 const stages: PipelineStage[] = [
-  { stage: "Qualification", value: 180, displayValue: "$180K", count: 8 },
-  { stage: "Proposal", value: 420, displayValue: "$420K", count: 6 },
-  { stage: "Negotiation", value: 356, displayValue: "$356K", count: 5 },
-  { stage: "Approval", value: 210, displayValue: "$210K", count: 3 },
-  { stage: "Closed Won", value: 324, displayValue: "$324K", count: 4 },
+  { stage: "Qualification", value: 180, displayValue: "₹18.0L", count: 8 },
+  { stage: "Proposal", value: 420, displayValue: "₹42.0L", count: 6 },
+  { stage: "Negotiation", value: 356, displayValue: "₹35.6L", count: 5 },
+  { stage: "Approval", value: 210, displayValue: "₹21.0L", count: 3 },
+  { stage: "Closed Won", value: 324, displayValue: "₹32.4L", count: 4 },
 ];
 
 const maxValue = 420;
@@ -90,11 +90,11 @@ export const PipelinePerformance: React.FC = () => {
 
       {/* Grid Scale Line */}
       <div className="mt-4 pt-2 border-t border-[#F1F5F9] flex justify-between pl-32 pr-20 text-[10px] font-label-sm text-outline">
-        <span>$0</span>
-        <span>$100K</span>
-        <span>$200K</span>
-        <span>$300K</span>
-        <span>$420K Max</span>
+        <span>₹0</span>
+        <span>₹10L</span>
+        <span>₹20L</span>
+        <span>₹30L</span>
+        <span>₹42L Max</span>
       </div>
     </div>
   );
