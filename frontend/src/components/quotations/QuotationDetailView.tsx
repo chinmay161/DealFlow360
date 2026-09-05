@@ -13,8 +13,14 @@ import { DecisionTraceModal } from "@/components/quotations/DecisionTraceModal";
 
 import { formatCurrency } from "@/lib/currency";
 import { QueryProvider } from "@/components/providers/QueryProvider";
-import { QuotationInventoryWidget } from "@/features/inventory/components/QuotationInventoryWidget";
-import { RuleEngineInventoryStatusWidget } from "@/features/inventory/components/RuleEngineInventoryStatusWidget";
+import {
+  QuotationInventoryWidget,
+  RuleEngineInventoryStatusWidget,
+  FulfillmentTimeline,
+  ReservationStatusCard,
+  ShipmentStatusCard,
+  WarehouseComparison,
+} from "@/features/inventory/components";
 
 interface QuotationDetailViewProps {
   quotation: SerializedQuotationDetail;
@@ -83,14 +89,94 @@ export const QuotationDetailView: React.FC<QuotationDetailViewProps> = ({ quotat
 
         {/* Live Regional Inventory & Availability Visibility */}
         <QueryProvider>
+          {/* 6-Stage Quotation to Shipment Fulfillment Stepper */}
+          <FulfillmentTimeline
+            currentStage={
+              quotation.status === "APPROVED"
+                ? "RESERVED"
+                : quotation.status === "SENT"
+                ? "APPROVED"
+                : "SUBMITTED"
+            }
+          />
+
+          {/* Quotation Line Stock Breakdown */}
           <QuotationInventoryWidget
             quotationId={quotation.id}
             quotationNumber={quotation.quotationNumber}
             lineItems={quotation.lineItems}
           />
+
+          {/* Operational Reservation & Consignment Tracking Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-space-base">
+            <ReservationStatusCard
+              data={{
+                quotationNumber: quotation.quotationNumber,
+                warehouseName: "Mumbai Central Hub (WH-BOM)",
+                status: quotation.status === "APPROVED" || quotation.status === "ACCEPTED" ? "RESERVED" : "PENDING",
+                reservedQuantity: quotation.lineItems.reduce((sum, li) => sum + li.quantity, 0),
+                reservedAt: "Upon quotation approval",
+                expiresAt: "7 days from reservation",
+              }}
+            />
+            <ShipmentStatusCard
+              data={{
+                shipmentNumber: `SHP-${quotation.quotationNumber.replace("Q-", "") || "1048"}`,
+                carrier: "BlueDart Enterprise Express",
+                trackingNumber: `BD-${quotation.id.slice(0, 8).toUpperCase()}`,
+                status: quotation.status === "ACCEPTED" ? "SHIPPED" : "PACKED",
+                estimatedDelivery: "Tomorrow by 2:00 PM",
+                originWarehouse: "Mumbai Central Hub",
+              }}
+            />
+          </div>
+
+          {/* Rule Engine Inventory Validation & Governance */}
           <RuleEngineInventoryStatusWidget
             quotationId={quotation.id}
             quotationNumber={quotation.quotationNumber}
+          />
+
+          {/* Regional Network Capacity Comparison */}
+          <WarehouseComparison
+            warehouses={[
+              {
+                id: "wh-1",
+                name: "Mumbai Central Hub",
+                code: "WH-BOM",
+                location: "Bhiwandi, Maharashtra",
+                capacity: 10000,
+                availableStock: 7420,
+                reservedStock: 1850,
+                utilizationRate: 74.2,
+                leadTimeDays: 1,
+                status: "ACTIVE",
+              },
+              {
+                id: "wh-2",
+                name: "Bengaluru South Hub",
+                code: "WH-BLR",
+                location: "Whitefield, Karnataka",
+                capacity: 8500,
+                availableStock: 5900,
+                reservedStock: 1100,
+                utilizationRate: 69.4,
+                leadTimeDays: 1,
+                status: "ACTIVE",
+              },
+              {
+                id: "wh-3",
+                name: "Delhi North Hub",
+                code: "WH-DEL",
+                location: "Gurugram, Haryana",
+                capacity: 6000,
+                availableStock: 5200,
+                reservedStock: 950,
+                utilizationRate: 86.6,
+                leadTimeDays: 2,
+                status: "ACTIVE",
+              },
+            ]}
           />
         </QueryProvider>
 
