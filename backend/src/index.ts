@@ -4,6 +4,7 @@ import dotenv from "dotenv";
 import { createDecisionTraceRouter } from "./modules/decision-trace/index.js";
 import { createApprovalRouter } from "./modules/approval-routing/index.js";
 import { createCounterfactualRouter } from "./modules/counterfactual/index.js";
+import { createQuotationStateRouter } from "./modules/quotation-state/index.js";
 
 dotenv.config();
 
@@ -25,6 +26,7 @@ app.get("/health", (_req: Request, res: Response) => {
 app.use(createDecisionTraceRouter());
 app.use(createApprovalRouter());
 app.use(createCounterfactualRouter());
+app.use(createQuotationStateRouter());
 
 app.listen(PORT, () => {
   console.log(`[DealFlow360 Backend] Server running on http://localhost:${PORT}`);
