@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 
 interface RuleTraceItem {
   id?: string;
+  ruleId?: string;
   ruleName: string;
   outcome: "PASS" | "FAIL" | "WARN" | "SKIP";
   computedValue?: number;
@@ -240,11 +241,35 @@ export const DecisionTraceModal: React.FC<DecisionTraceModalProps> = ({
                           </span>
                         </div>
 
-                        {(rule.computedValue !== undefined || rule.threshold !== undefined) && (
-                          <div className="mt-2.5 pt-2 border-t border-black/5 flex items-center justify-between text-[10px] text-outline font-code-tabular">
-                            <span>Computed: <strong>{rule.computedValue}%</strong></span>
-                            <span>Policy Threshold: <strong>{rule.threshold}%</strong></span>
+                        {/* Specialized Inventory Availability Rule breakdown */}
+                        {rule.ruleId === "inventory-availability" || rule.inputs?.requestedQuantity !== undefined ? (
+                          <div className="mt-3 pt-2.5 border-t border-black/5 space-y-2">
+                            <div className="grid grid-cols-3 gap-2 bg-black/5 p-2 rounded text-[11px] font-mono">
+                              <div>
+                                <span className="text-[9px] text-outline uppercase block">Input: Requested</span>
+                                <strong className="text-on-surface">{rule.inputs?.requestedQuantity ?? rule.threshold} units</strong>
+                              </div>
+                              <div>
+                                <span className="text-[9px] text-outline uppercase block">Input: Available</span>
+                                <strong className="text-on-surface">{rule.inputs?.availableQuantity ?? "—"} units</strong>
+                              </div>
+                              <div>
+                                <span className="text-[9px] text-outline uppercase block">Input: Reserved</span>
+                                <strong className="text-amber-700">{rule.inputs?.reservedQuantity ?? 0} units</strong>
+                              </div>
+                            </div>
+                            <div className="flex items-center justify-between text-[10px] text-outline font-code-tabular px-1">
+                              <span>Computed Free Stock: <strong className="text-emerald-700">{rule.computedValue} units</strong></span>
+                              <span>Policy Threshold (Required): <strong className="text-primary">{rule.threshold} units</strong></span>
+                            </div>
                           </div>
+                        ) : (
+                          (rule.computedValue !== undefined || rule.threshold !== undefined) && (
+                            <div className="mt-2.5 pt-2 border-t border-black/5 flex items-center justify-between text-[10px] text-outline font-code-tabular">
+                              <span>Computed: <strong>{rule.computedValue}%</strong></span>
+                              <span>Policy Threshold: <strong>{rule.threshold}%</strong></span>
+                            </div>
+                          )
                         )}
                       </div>
                     );

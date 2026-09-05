@@ -14,6 +14,12 @@ interface CounterfactualItem {
   deltaDiscount: number;
   marginImprovement: number;
   rationale: string;
+  actionType?: string;
+  requestedQuantity?: number;
+  availableQuantity?: number;
+  approvalImpact?: string;
+  revenueImpact?: string;
+  riskScore?: number;
 }
 
 interface CounterfactualCardProps {
@@ -61,13 +67,22 @@ export const CounterfactualCard: React.FC<CounterfactualCardProps> = ({ quotatio
   const handleApply = async (item: CounterfactualItem) => {
     if (!item.lineItemId) return;
     setApplyingId(item.id);
-    const chosenDiscount = simulatedValues[item.id] ?? item.targetDiscount;
+
     try {
-      await updateLineItemAction({
-        lineItemId: item.lineItemId,
-        discountPercent: chosenDiscount,
-      });
-      setSuccessMessage(`Applied discount adjustment (${chosenDiscount}%) to ${item.productName}! Deal margin improved.`);
+      if (item.actionType === "INVENTORY_QUANTITY_REDUCTION" && item.availableQuantity !== undefined) {
+        await updateLineItemAction({
+          lineItemId: item.lineItemId,
+          quantity: item.availableQuantity,
+        });
+        setSuccessMessage(`Adjusted ${item.productName} quantity to ${item.availableQuantity} units. Auto-approval criteria met!`);
+      } else {
+        const chosenDiscount = simulatedValues[item.id] ?? item.targetDiscount;
+        await updateLineItemAction({
+          lineItemId: item.lineItemId,
+          discountPercent: chosenDiscount,
+        });
+        setSuccessMessage(`Applied discount adjustment (${chosenDiscount}%) to ${item.productName}! Deal margin improved.`);
+      }
       setTimeout(() => setSuccessMessage(null), 4000);
       router.refresh();
     } catch (err) {
@@ -87,14 +102,14 @@ export const CounterfactualCard: React.FC<CounterfactualCardProps> = ({ quotatio
             troubleshoot
           </span>
           <h3 className="font-title-md text-xs font-bold text-on-surface">
-            Counterfactual Margin Optimization Engine
+            Counterfactual Recommendation Engine
           </h3>
           <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
-            Active Simulations
+            Active Guidance ({recommendations.length})
           </span>
         </div>
         <span className="text-[11px] text-outline">
-          Interactive what-if simulations for margin compliance
+          Automated commercial and inventory optimization simulations
         </span>
       </div>
 
@@ -110,6 +125,10 @@ export const CounterfactualCard: React.FC<CounterfactualCardProps> = ({ quotatio
       <div className="space-y-3">
         {recommendations.map((rec) => {
           const isApplying = applyingId === rec.id;
+          const isInventoryRec =
+            rec.actionType === "INVENTORY_QUANTITY_REDUCTION" ||
+            rec.actionType === "INVENTORY_SPLIT_SHIPMENT";
+
           const currentSimValue = simulatedValues[rec.id] ?? rec.targetDiscount;
           const simMarginBoost = Math.max(
             0,
@@ -119,20 +138,35 @@ export const CounterfactualCard: React.FC<CounterfactualCardProps> = ({ quotatio
           return (
             <div
               key={rec.id}
-              className="bg-white/90 border border-emerald-100 rounded-lg p-3.5 space-y-2 shadow-xs hover:border-emerald-200 transition-colors"
+              className={`bg-white/90 border rounded-lg p-3.5 space-y-2 shadow-xs transition-colors ${
+                isInventoryRec
+                  ? "border-blue-200 hover:border-blue-300"
+                  : "border-emerald-100 hover:border-emerald-200"
+              }`}
             >
               <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-title-md text-xs font-bold text-on-surface">
                     {rec.productName}
                   </span>
-                  <span className="text-[11px] text-outline font-code-tabular">
-                    Current: <strong>{rec.currentDiscount}%</strong> &rarr; Simulated:{" "}
-                    <strong className="text-emerald-700">{currentSimValue}%</strong>
-                  </span>
-                  <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                    +{simMarginBoost}% Margin Boost
-                  </span>
+
+                  {isInventoryRec ? (
+                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-800 border border-blue-200">
+                      {rec.actionType === "INVENTORY_QUANTITY_REDUCTION"
+                        ? "Reduce Quantity"
+                        : "Split Shipment Recommendation"}
+                    </span>
+                  ) : (
+                    <>
+                      <span className="text-[11px] text-outline font-code-tabular">
+                        Current: <strong>{rec.currentDiscount}%</strong> &rarr; Simulated:{" "}
+                        <strong className="text-emerald-700">{currentSimValue}%</strong>
+                      </span>
+                      <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        +{simMarginBoost}% Margin Boost
+                      </span>
+                    </>
+                  )}
                 </div>
 
                 {rec.lineItemId && (
@@ -140,12 +174,22 @@ export const CounterfactualCard: React.FC<CounterfactualCardProps> = ({ quotatio
                     type="button"
                     disabled={isApplying}
                     onClick={() => handleApply(rec)}
-                    className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-label-md text-xs font-semibold shrink-0 transition-colors shadow-xs flex items-center gap-1.5 disabled:opacity-50"
+                    className={`px-3 py-1.5 rounded-lg text-white font-label-md text-xs font-semibold shrink-0 transition-colors shadow-xs flex items-center gap-1.5 disabled:opacity-50 ${
+                      isInventoryRec
+                        ? "bg-primary hover:bg-[#1E3A8A]"
+                        : "bg-emerald-600 hover:bg-emerald-700"
+                    }`}
                   >
                     <span className="material-symbols-outlined text-sm" data-icon="auto_fix_high">
                       auto_fix_high
                     </span>
-                    <span>{isApplying ? "Optimizing..." : "Apply Suggestion"}</span>
+                    <span>
+                      {isApplying
+                        ? "Optimizing..."
+                        : isInventoryRec && rec.actionType === "INVENTORY_QUANTITY_REDUCTION"
+                        ? `Set Qty to ${rec.availableQuantity}`
+                        : "Apply Suggestion"}
+                    </span>
                   </button>
                 )}
               </div>
@@ -154,30 +198,48 @@ export const CounterfactualCard: React.FC<CounterfactualCardProps> = ({ quotatio
                 {rec.rationale}
               </p>
 
-              {/* Interactive What-If Slider */}
-              <div className="pt-2 border-t border-emerald-50 flex items-center gap-3">
-                <span className="text-[10px] uppercase font-bold text-outline tracking-wider whitespace-nowrap">
-                  What-If Discount:
-                </span>
-                <input
-                  type="range"
-                  min="0"
-                  max={Math.max(rec.currentDiscount, 30)}
-                  step="0.5"
-                  value={currentSimValue}
-                  onChange={(e) => {
-                    const val = parseFloat(e.target.value);
-                    setSimulatedValues((prev) => ({ ...prev, [rec.id]: val }));
-                  }}
-                  className="w-48 h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-emerald-600"
-                />
-                <span className="text-xs font-mono font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                  {currentSimValue}%
-                </span>
-                <span className="text-[11px] text-outline">
-                  (Simulated Boost: +{simMarginBoost}%)
-                </span>
-              </div>
+              {/* Expected Result Breakdown */}
+              {isInventoryRec ? (
+                <div className="pt-2 border-t border-slate-100 grid grid-cols-3 gap-2 text-[10px]">
+                  <div className="p-1.5 rounded bg-blue-50/50 border border-blue-100">
+                    <span className="text-slate-500 uppercase block font-semibold">Approval Impact</span>
+                    <strong className="text-primary mt-0.5 block">{rec.approvalImpact || "Auto Approval"}</strong>
+                  </div>
+                  <div className="p-1.5 rounded bg-emerald-50/50 border border-emerald-100">
+                    <span className="text-slate-500 uppercase block font-semibold">Revenue Impact</span>
+                    <strong className="text-emerald-700 mt-0.5 block">{rec.revenueImpact || "Immediate"}</strong>
+                  </div>
+                  <div className="p-1.5 rounded bg-slate-50 border border-slate-200">
+                    <span className="text-slate-500 uppercase block font-semibold">Risk Score</span>
+                    <strong className="text-slate-800 mt-0.5 block">{rec.riskScore || 20}/100</strong>
+                  </div>
+                </div>
+              ) : (
+                /* Interactive What-If Slider */
+                <div className="pt-2 border-t border-emerald-50 flex items-center gap-3">
+                  <span className="text-[10px] uppercase font-bold text-outline tracking-wider whitespace-nowrap">
+                    What-If Discount:
+                  </span>
+                  <input
+                    type="range"
+                    min="0"
+                    max={Math.max(rec.currentDiscount, 30)}
+                    step="0.5"
+                    value={currentSimValue}
+                    onChange={(e) => {
+                      const val = parseFloat(e.target.value);
+                      setSimulatedValues((prev) => ({ ...prev, [rec.id]: val }));
+                    }}
+                    className="w-48 h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-emerald-600"
+                  />
+                  <span className="text-xs font-mono font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                    {currentSimValue}%
+                  </span>
+                  <span className="text-[11px] text-outline">
+                    (Simulated Boost: +{simMarginBoost}%)
+                  </span>
+                </div>
+              )}
             </div>
           );
         })}
