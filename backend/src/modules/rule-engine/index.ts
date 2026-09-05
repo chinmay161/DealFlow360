@@ -24,8 +24,9 @@ export type {
 } from "./interfaces/Rule.js";
 export { Severity, ApprovalLevel } from "./interfaces/Rule.js";
 
-// ── Services ─────────────────────────────────────────────────────────────────
+// ── Services & Routes ────────────────────────────────────────────────────────
 export { RuleEvaluationService } from "./services/RuleEvaluationService.js";
+export { createRuleEngineRouter } from "./routes/routes.js";
 // NOTE: DecisionTraceService has been moved to src/modules/decision-trace/
 // which provides a richer implementation with formatting, filtering, export, etc.
 

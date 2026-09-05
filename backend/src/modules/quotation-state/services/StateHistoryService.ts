@@ -77,40 +77,26 @@ export class StateHistoryService implements IStateHistoryService {
         entity: "QuotationState",
         entityId: quotationId,
       },
-      include: {
-        user: {
-          include: {
-            role: true,
-          },
-        },
-      },
       orderBy: {
         createdAt: "asc",
       },
     });
 
     return logs.map((record: any) => {
-      const prev = (record.prevValue as any) ?? {};
-      const next = (record.newValue as any) ?? {};
+      const meta = (record.metadata as any) ?? {};
+      const prev = record.prevValue ?? ((record.fromState) ? { state: record.fromState } : (meta.prevValue ?? {}));
+      const next = record.newValue ?? ((record.toState) ? { state: record.toState } : (meta.newValue ?? {}));
 
       return {
         id: record.id,
         quotationId: record.entityId,
-        previousState: (prev.state as QuotationState) ?? "Unknown",
-        nextState: (next.state as QuotationState) ?? "Unknown",
+        previousState: (prev?.state as QuotationState) ?? (record.fromState as QuotationState) ?? "Unknown",
+        nextState: (next?.state as QuotationState) ?? (record.toState as QuotationState) ?? "Unknown",
         actorId: record.userId ?? next.actorId ?? "system",
-        actor: record.user
-          ? {
-              id: record.user.id,
-              email: record.user.email,
-              firstName: record.user.firstName,
-              lastName: record.user.lastName,
-              role: record.user.role?.name ?? record.user.roleId,
-            }
-          : undefined,
+        actor: undefined,
         reason: next.reason ?? undefined,
         timestamp: record.createdAt,
-        metadata: next.metadata ?? undefined,
+        metadata: next.metadata ?? meta,
       };
     });
   }

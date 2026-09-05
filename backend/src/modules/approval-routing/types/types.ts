@@ -4,18 +4,16 @@
 
 import type {
   ApprovalStatus,
-  ApprovalAction,
   QuotationStatus,
-  RoleType,
-  AuditAction,
 } from "@prisma/client";
+
+export type RoleType = "SALES_REP" | "SALES_MANAGER" | "FINANCE_MANAGER" | "VP_SALES" | "ADMIN" | "LEGAL" | "OPERATIONS" | string;
+export type ApprovalAction = "APPROVE" | "REJECT" | "ESCALATE" | "REQUEST_CHANGE" | string;
+export type AuditAction = "CREATE" | "UPDATE" | "DELETE" | "APPROVE" | "REJECT" | "ESCALATE" | string;
 
 export type {
   ApprovalStatus,
-  ApprovalAction,
   QuotationStatus,
-  RoleType,
-  AuditAction,
 };
 
 export type WorkflowStatus = "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "REJECTED";

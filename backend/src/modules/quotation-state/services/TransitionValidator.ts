@@ -105,7 +105,6 @@ export class TransitionValidator implements ITransitionValidator {
     if (actorId && actorId !== "system") {
       const actorUser = await this.prisma.user.findUnique({
         where: { id: actorId },
-        include: { role: true },
       });
 
       if (!actorUser) {
@@ -113,16 +112,18 @@ export class TransitionValidator implements ITransitionValidator {
         throw new ActorNotFoundError(actorId);
       }
 
+      const roleName = typeof actorUser.role === "string" 
+        ? actorUser.role 
+        : ((actorUser.role as any)?.name || "SALES_REP");
+
       // Populate actor on context for downstream use
       context.actor = {
         id: actorUser.id,
         email: actorUser.email,
-        firstName: actorUser.firstName,
-        lastName: actorUser.lastName,
-        role: actorUser.role?.name ?? (actorUser as any).roleId,
+        firstName: (actorUser as any).name?.split(" ")[0] || (actorUser as any).firstName || "User",
+        lastName: (actorUser as any).name?.split(" ").slice(1).join(" ") || (actorUser as any).lastName || "",
+        role: roleName,
       };
-
-      const roleName = actorUser.role?.name ?? (actorUser as any).roleId;
 
       // Role permission checks based on transition
       this.validateRolePermissions(actualCurrentState, targetState, roleName, actorId);

@@ -6,8 +6,8 @@
  * structured to support round-robin, load-balanced, or geography-based routing in the future.
  */
 
-import type { PrismaClient, RoleType } from "@prisma/client";
-import type { ApproverUserInfo } from "../types/types.js";
+import type { PrismaClient } from "@prisma/client";
+import type { ApproverUserInfo, RoleType } from "../types/types.js";
 import { ApproverNotFoundError } from "../utils/errors.js";
 import { createModuleLogger } from "../../../lib/logger.js";
 

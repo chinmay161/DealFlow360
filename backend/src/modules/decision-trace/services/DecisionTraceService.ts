@@ -86,7 +86,7 @@ export class DecisionTraceService {
     const evalStart = performance.now();
     const rawEvaluations = await this.prisma.ruleEvaluation.findMany({
       where: { quotationId },
-      orderBy: { evaluatedAt: "asc" },
+      orderBy: { createdAt: "asc" },
     });
     const evalQueryMs = performance.now() - evalStart;
 
@@ -102,19 +102,32 @@ export class DecisionTraceService {
     }
 
     // 4. Normalise Prisma records
-    const evaluations: RuleEvaluationRecord[] = rawEvaluations.map((ev) => ({
-      id: ev.id,
-      ruleName: ev.ruleName,
-      inputs: ev.inputs,
-      computedValue: Number(ev.computedValue),
-      threshold: Number(ev.threshold),
-      outcome: ev.outcome as RuleEvaluationRecord["outcome"],
-      explanation: ev.explanation,
-      evaluatedAt: ev.evaluatedAt,
-      createdAt: ev.createdAt,
-      quotationId: ev.quotationId,
-      ruleId: ev.ruleId,
-    }));
+    const evaluations: RuleEvaluationRecord[] = rawEvaluations.map((ev: any) => {
+      const meta = (ev.metadata as Record<string, any>) || {};
+      const inputs = ev.inputs ?? meta.inputs ?? meta.metadata ?? meta;
+      const ruleId = ev.ruleId ?? inputs?.ruleId ?? meta?.ruleId ?? null;
+      const computedValue = ev.computedValue !== undefined && ev.computedValue !== null
+        ? Number(ev.computedValue)
+        : Number(inputs?.computedValue ?? meta.computedValue ?? 0);
+      const threshold = ev.threshold !== undefined && ev.threshold !== null
+        ? Number(ev.threshold)
+        : Number(inputs?.threshold ?? meta.threshold ?? 0);
+      const explanation = ev.explanation ?? ev.message ?? "";
+
+      return {
+        id: ev.id,
+        ruleName: ev.ruleName,
+        inputs: typeof inputs === "object" ? { ruleId, ...inputs } : { ruleId },
+        computedValue,
+        threshold,
+        outcome: (ev.outcome ?? "PASS") as RuleEvaluationRecord["outcome"],
+        explanation,
+        evaluatedAt: ev.evaluatedAt ?? ev.createdAt ?? new Date(),
+        createdAt: ev.createdAt ?? new Date(),
+        quotationId: ev.quotationId,
+        ruleId,
+      };
+    });
 
     // 5. Build trace
     const totalDbMs = quotationQueryMs + evalQueryMs;
@@ -191,23 +204,26 @@ export class DecisionTraceService {
 
     const rawResults = await this.prisma.ruleEvaluation.findMany({
       where,
-      orderBy: { evaluatedAt: "desc" },
+      orderBy: { createdAt: "desc" },
       take: 100, // cap results to prevent unbounded queries
     });
 
-    const records: RuleEvaluationRecord[] = rawResults.map((ev) => ({
-      id: ev.id,
-      ruleName: ev.ruleName,
-      inputs: ev.inputs,
-      computedValue: Number(ev.computedValue),
-      threshold: Number(ev.threshold),
-      outcome: ev.outcome as RuleEvaluationRecord["outcome"],
-      explanation: ev.explanation,
-      evaluatedAt: ev.evaluatedAt,
-      createdAt: ev.createdAt,
-      quotationId: ev.quotationId,
-      ruleId: ev.ruleId,
-    }));
+    const records: RuleEvaluationRecord[] = rawResults.map((ev) => {
+      const meta = (ev.metadata as Record<string, any>) || {};
+      return {
+        id: ev.id,
+        ruleName: ev.ruleName,
+        inputs: meta.metadata ?? meta,
+        computedValue: Number(meta.computedValue ?? 0),
+        threshold: Number(meta.threshold ?? 0),
+        outcome: ev.outcome as RuleEvaluationRecord["outcome"],
+        explanation: ev.message ?? "",
+        evaluatedAt: ev.createdAt,
+        createdAt: ev.createdAt,
+        quotationId: ev.quotationId,
+        ruleId: ev.ruleId,
+      };
+    });
 
     return buildRuleEntries(records);
   }

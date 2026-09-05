@@ -5,7 +5,7 @@
  * context shapes, and audit history models.
  */
 
-import type { RoleType } from "@prisma/client";
+export type RoleType = "SALES_REP" | "SALES_MANAGER" | "FINANCE_MANAGER" | "VP_SALES" | "ADMIN" | "LEGAL" | "OPERATIONS" | string;
 
 /**
  * Complete set of quotation lifecycle states supported by the State Machine.

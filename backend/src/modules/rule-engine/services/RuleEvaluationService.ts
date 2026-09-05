@@ -62,21 +62,18 @@ export class RuleEvaluationService {
       await tx.ruleEvaluation.createMany({
         data: results.map((r) => ({
           quotationId,
-          ruleId: null, // rule engine rules don't have a DB ApprovalRule.id counterpart
+          ruleId: r.ruleId,
           ruleName: r.ruleName,
-          inputs: JSON.parse(JSON.stringify({
-            ruleId: r.ruleId,
+          outcome: toOutcome(r),
+          severity: r.severity,
+          score: r.score,
+          message: r.message,
+          metadata: {
             computedValue: r.computedValue,
             threshold: r.threshold,
-            severity: r.severity,
             approvalLevel: r.approvalLevel,
             metadata: r.metadata,
-          })) as Prisma.InputJsonValue,
-          computedValue: r.computedValue,
-          threshold: r.threshold,
-          outcome: toOutcome(r),
-          explanation: r.message,
-          evaluatedAt: new Date(),
+          } as unknown as Prisma.InputJsonValue,
         })),
       });
 
@@ -85,7 +82,7 @@ export class RuleEvaluationService {
         where: { id: quotationId },
         data: {
           riskScore: riskScore !== null ? riskScore : undefined,
-          approvalState: toApprovalState(approvalLevel),
+          currentStage: toApprovalState(approvalLevel),
         },
       });
     });
