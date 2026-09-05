@@ -94,8 +94,12 @@ export const authConfig: NextAuthConfig = {
       const isLoginPage = pathname === "/login";
       if (isLoginPage) {
         if (isLoggedIn) {
-          if ((auth?.user as any)?.role === "CUSTOMER") {
+          const userRole = (auth?.user as any)?.role;
+          if (userRole === "CUSTOMER") {
             return Response.redirect(new URL("/customer/dashboard", nextUrl));
+          }
+          if (userRole === "MANAGER") {
+            return Response.redirect(new URL("/manager/dashboard", nextUrl));
           }
           return Response.redirect(new URL("/overview", nextUrl));
         }
@@ -106,6 +110,13 @@ export const authConfig: NextAuthConfig = {
       if (isLoggedIn && (auth?.user as any)?.role === "CUSTOMER") {
         if (pathname === "/dashboard" || pathname === "/overview" || pathname === "/") {
           return Response.redirect(new URL("/customer/dashboard", nextUrl));
+        }
+      }
+
+      // If manager accesses root, redirect to manager dashboard
+      if (isLoggedIn && (auth?.user as any)?.role === "MANAGER") {
+        if (pathname === "/") {
+          return Response.redirect(new URL("/manager/dashboard", nextUrl));
         }
       }
 

@@ -8,6 +8,9 @@ export default async function RootPage() {
   if ((session?.user as any)?.role === "CUSTOMER") {
     redirect("/customer/dashboard");
   }
+  if ((session?.user as any)?.role === "MANAGER") {
+    redirect("/manager/dashboard");
+  }
 
   redirect("/overview");
 }
