@@ -25,33 +25,35 @@ export const QuotationDetailView: React.FC<QuotationDetailViewProps> = ({ quotat
               ? "Gold Tier"
               : "Standard Tier"
           }
-          priceList="Enterprise Price List 2026"
+          priceList="Gold Preferred India 2026"
           revisionText="Revision History (v3)"
         />
 
         <CustomerSummary
+          quotationId={quotation.id}
           customer={quotation.customer}
           owner={quotation.owner}
           buyerContact={
-            quotation.customer.name === "Acme Corporation"
+            quotation.customer.name === "Apex Infotech Pvt. Ltd."
               ? {
-                  name: "Sarah Jenkins",
+                  name: "Ananya Shah",
                   title: "VP Procurement",
-                  email: "s.jenkins@acme.com",
+                  email: "ananya.shah@apexinfotech.example",
                 }
               : null
           }
           paymentTerms="Net 45 Days"
-          creditLine="Credit Line: $250,000.00 Active"
-          territory="Territory: North America West"
+          creditLine="Credit Line: ₹25,00,000.00 Active"
+          territory="Territory: South India (Bengaluru)"
         />
 
         <QuoteLineItemsTable
+          quotationId={quotation.id}
           lineItems={quotation.lineItems}
           currency={quotation.currency}
         />
 
-        <RecommendationSection />
+        <RecommendationSection quotationId={quotation.id} />
 
         <DealIntelligenceRow
           currency={quotation.currency}
@@ -68,6 +70,7 @@ export const QuotationDetailView: React.FC<QuotationDetailViewProps> = ({ quotat
 
       {/* BOTTOM ELEVATED ACTION BAR */}
       <QuoteActionBar
+        quotation={quotation}
         totalValue={quotation.totalValue}
         currency={quotation.currency}
         status={quotation.status}

@@ -7,11 +7,22 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ──────────────────────────────────────────────────────────────────────────────
+// Enumerations
+// ──────────────────────────────────────────────────────────────────────────────
+
 enum UserRole {
   ADMIN
   SALES_REP
   APPROVER
   CUSTOMER
+}
+
+enum CustomerTier {
+  BRONZE
+  SILVER
+  GOLD
+  PLATINUM
 }
 
 enum QuotationStatus {
@@ -45,6 +56,10 @@ enum WorkflowStepStatus {
   SKIPPED
 }
 
+// ──────────────────────────────────────────────────────────────────────────────
+// Authentication & User Model
+// ──────────────────────────────────────────────────────────────────────────────
+
 model User {
   id                 String                 @id @default(uuid())
   email              String                 @unique
@@ -60,22 +75,107 @@ model User {
   sessions           Session[]
 
   ownedQuotations    Quotation[]            @relation("QuotationOwner")
+  ownedCustomers     Customer[]             @relation("CustomerOwner")
+  contacts           Contact[]
   requestedApprovals Approval[]             @relation("ApprovalRequester")
   assignedApprovals  Approval[]             @relation("ApprovalAssignee")
   workflowSteps      ApprovalWorkflowStep[] @relation("StepApprover")
   approvalHistories  ApprovalHistory[]      @relation("HistoryActor")
 }
 
+// ──────────────────────────────────────────────────────────────────────────────
+// Customer & Contact Models
+// ──────────────────────────────────────────────────────────────────────────────
+
 model Customer {
-  id                String      @id @default(uuid())
+  id                String         @id @default(uuid())
   name              String
   externalAccountId String?
   industry          String?
-  createdAt         DateTime    @default(now())
-  updatedAt         DateTime    @updatedAt
+  tier              CustomerTier   @default(BRONZE)
+  paymentTerms      String?        @default("Net 30 Days")
+  creditLimit       Decimal        @default(100000.00) @db.Decimal(14, 2)
+  creditAvailable   Decimal        @default(100000.00) @db.Decimal(14, 2)
+  territory         String?
+  ownerId           String?
+  owner             User?          @relation("CustomerOwner", fields: [ownerId], references: [id])
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
 
   quotations        Quotation[]
+  contacts          Contact[]
+  subscriptions     Subscription[]
+
+  @@index([tier])
+  @@index([ownerId])
 }
+
+model Contact {
+  id           String    @id @default(uuid())
+  customerId   String
+  customer     Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  userId       String?   @unique
+  user         User?     @relation(fields: [userId], references: [id])
+  name         String
+  email        String
+  phone        String?
+  title        String?
+  isPrimary    Boolean   @default(false)
+  portalAccess Boolean   @default(false)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([customerId])
+  @@index([email])
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Product Catalog & Hierarchy
+// ──────────────────────────────────────────────────────────────────────────────
+
+model Category {
+  id          String     @id @default(uuid())
+  name        String     @unique
+  description String?
+  parentId    String?
+  parent      Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children    Category[] @relation("CategoryHierarchy")
+  products    Product[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@index([parentId])
+}
+
+model Product {
+  id                     String                  @id @default(uuid())
+  sku                    String                  @unique
+  name                   String
+  description            String?
+  categoryId             String
+  category               Category                @relation(fields: [categoryId], references: [id])
+  unitPrice              Decimal                 @db.Decimal(14, 2)
+  costPrice              Decimal                 @db.Decimal(14, 2)
+  taxRate                Decimal                 @default(0.00) @db.Decimal(5, 2)
+  unit                   String                  @default("unit")
+  isActive               Boolean                 @default(true)
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+
+  priceListItems         PriceListItem[]
+  inventoryItems         InventoryItem[]
+  quoteLineItems         QuoteLineItem[]
+  recommendationsAsSource ProductRecommendation[] @relation("SourceProduct")
+  recommendationsAsTarget ProductRecommendation[] @relation("TargetProduct")
+
+  @@index([sku])
+  @@index([categoryId])
+  @@index([isActive])
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Quotation & Quote Line Items
+// ──────────────────────────────────────────────────────────────────────────────
 
 model Quotation {
   id              String            @id @default(uuid())
@@ -98,6 +198,7 @@ model Quotation {
 
   lineItems       QuoteLineItem[]
   approvals       Approval[]
+  subscriptions   Subscription[]
 
   @@index([customerId])
   @@index([ownerId])
@@ -108,6 +209,8 @@ model QuoteLineItem {
   id                     String    @id @default(uuid())
   quotationId            String
   quotation              Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  productId              String?
+  product                Product?  @relation(fields: [productId], references: [id])
   productName            String
   sku                    String?
   quantity               Int       @default(1)
@@ -121,7 +224,170 @@ model QuoteLineItem {
   updatedAt              DateTime  @updatedAt
 
   @@index([quotationId])
+  @@index([productId])
 }
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Price Lists
+// ──────────────────────────────────────────────────────────────────────────────
+
+model PriceList {
+  id          String          @id @default(uuid())
+  name        String
+  code        String          @unique
+  description String?
+  currency    String          @default("USD")
+  tier        CustomerTier?
+  isActive    Boolean         @default(true)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  items       PriceListItem[]
+
+  @@index([code])
+  @@index([tier])
+}
+
+model PriceListItem {
+  id          String    @id @default(uuid())
+  priceListId String
+  priceList   PriceList @relation(fields: [priceListId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  price       Decimal   @db.Decimal(14, 2)
+  minQuantity Int       @default(1)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([priceListId, productId])
+  @@index([productId])
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Discount Governance Rules
+// ──────────────────────────────────────────────────────────────────────────────
+
+model DiscountRule {
+  id                 String        @id @default(uuid())
+  name               String
+  code               String        @unique
+  description        String?
+  category           String?
+  tier               CustomerTier?
+  maxDiscountPercent Decimal       @db.Decimal(5, 2)
+  requiredRole       String
+  requiresApproval   Boolean       @default(true)
+  isActive           Boolean       @default(true)
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  @@index([code])
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Product Recommendations
+// ──────────────────────────────────────────────────────────────────────────────
+
+model ProductRecommendation {
+  id                  String   @id @default(uuid())
+  sourceProductId     String
+  sourceProduct       Product  @relation("SourceProduct", fields: [sourceProductId], references: [id], onDelete: Cascade)
+  targetProductId     String
+  targetProduct       Product  @relation("TargetProduct", fields: [targetProductId], references: [id], onDelete: Cascade)
+  recommendationType  String   // CROSS_SELL, UPSELL, BUNDLE
+  rationale           String
+  confidenceScore     Decimal  @db.Decimal(5, 2)
+  estimatedMarginGain Decimal? @db.Decimal(14, 2)
+  priority            Int      @default(1)
+  isActive            Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([sourceProductId])
+  @@index([targetProductId])
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Warehouses & Inventory
+// ──────────────────────────────────────────────────────────────────────────────
+
+model Warehouse {
+  id        String          @id @default(uuid())
+  code      String          @unique
+  name      String
+  location  String
+  country   String          @default("USA")
+  isActive  Boolean         @default(true)
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  inventory InventoryItem[]
+
+  @@index([code])
+}
+
+model InventoryItem {
+  id                String    @id @default(uuid())
+  warehouseId       String
+  warehouse         Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  productId         String
+  product           Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  quantityOnHand    Int       @default(0)
+  quantityReserved  Int       @default(0)
+  quantityAvailable Int       @default(0)
+  reorderPoint      Int       @default(10)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@unique([warehouseId, productId])
+  @@index([productId])
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Subscriptions & Recurring Plans
+// ──────────────────────────────────────────────────────────────────────────────
+
+model SubscriptionPlan {
+  id           String         @id @default(uuid())
+  code         String         @unique
+  name         String
+  description  String?
+  interval     String         @default("MONTHLY") // MONTHLY, ANNUAL
+  billingPrice Decimal        @db.Decimal(14, 2)
+  currency     String         @default("USD")
+  isActive     Boolean        @default(true)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  subscriptions Subscription[]
+
+  @@index([code])
+}
+
+model Subscription {
+  id                 String           @id @default(uuid())
+  customerId         String
+  customer           Customer         @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  quotationId        String?
+  quotation          Quotation?       @relation(fields: [quotationId], references: [id])
+  planId             String
+  plan               SubscriptionPlan @relation(fields: [planId], references: [id])
+  status             String           @default("ACTIVE")
+  currentPeriodStart DateTime
+  currentPeriodEnd   DateTime
+  mrr                Decimal          @db.Decimal(14, 2)
+  arr                Decimal          @db.Decimal(14, 2)
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  @@index([customerId])
+  @@index([planId])
+  @@index([status])
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Approvals & Workflow Governance
+// ──────────────────────────────────────────────────────────────────────────────
 
 model Approval {
   id            String                 @id @default(uuid())
@@ -179,6 +445,10 @@ model ApprovalHistory {
   @@index([approvalId])
   @@index([actorId])
 }
+
+// ──────────────────────────────────────────────────────────────────────────────
+// NextAuth Models
+// ──────────────────────────────────────────────────────────────────────────────
 
 model Account {
   id                String  @id @default(uuid())

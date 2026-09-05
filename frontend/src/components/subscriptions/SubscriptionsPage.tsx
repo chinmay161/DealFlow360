@@ -4,9 +4,10 @@ import React, { useMemo, useState } from "react";
 import { AppSidebar } from "@/components/AppSidebar";
 import { TopHeader } from "@/components/TopHeader";
 import { billingEvents, invoicePreview, subscriptionChange, subscriptionStats, subscriptions as initialSubscriptions } from "./mockData";
+import { formatCurrency } from "@/lib/currency";
 import type { BillingInterval, InvoicePreview, Subscription, SubscriptionStatus } from "./types";
 
-const money = (value: number, digits = 0) => `$${value.toLocaleString("en-US", { minimumFractionDigits: digits, maximumFractionDigits: digits })}`;
+const money = (value: number, digits = 0) => formatCurrency(value, "INR", { minimumFractionDigits: digits, maximumFractionDigits: digits });
 const card = "bg-white border border-[#E5E7EB] rounded-lg shadow-[0px_1px_2px_rgba(15,23,42,0.04)]";
 const successBadge = "inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-label-sm font-semibold bg-[#ECFDF5] text-[#065F46] border border-[#A7F3D0]";
 const infoBadge = "inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-label-sm font-semibold bg-[#EFF6FF] text-[#1E40AF] border border-[#BFDBFE]";

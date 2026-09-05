@@ -2,26 +2,20 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { SerializedQuotationListItem } from "@/lib/quotations";
+import { createNewQuotationAction } from "@/lib/actions/quoteActions";
+import { formatCurrency } from "@/lib/currency";
 
 interface QuotationsListTableProps {
   quotations: SerializedQuotationListItem[];
   error?: string | null;
 }
 
-function formatCurrency(amount: number, currency = "USD"): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: currency,
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(amount);
-}
-
 function formatDate(isoString: string): string {
   try {
     const d = new Date(isoString);
-    return d.toLocaleDateString("en-US", {
+    return d.toLocaleDateString("en-IN", {
       month: "short",
       day: "numeric",
       year: "numeric",
@@ -35,8 +29,23 @@ export const QuotationsListTable: React.FC<QuotationsListTableProps> = ({
   quotations,
   error,
 }) => {
+  const router = useRouter();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
+  const [isCreating, setIsCreating] = useState(false);
+
+  const handleCreateQuotation = async () => {
+    setIsCreating(true);
+    try {
+      const res = await createNewQuotationAction();
+      if (res.quotationNumber) {
+        router.push(`/quotations/${res.quotationNumber}`);
+      }
+    } catch (err) {
+      console.error("Failed to create quotation:", err);
+      setIsCreating(false);
+    }
+  };
 
   if (error) {
     return (
@@ -88,7 +97,7 @@ export const QuotationsListTable: React.FC<QuotationsListTableProps> = ({
           </p>
         </div>
 
-        {/* Search & Filter Bar */}
+        {/* Search & Filter Bar & Action */}
         <div className="flex items-center gap-2 w-full sm:w-auto">
           <div className="relative flex-1 sm:w-64">
             <span
@@ -118,6 +127,18 @@ export const QuotationsListTable: React.FC<QuotationsListTableProps> = ({
             <option value="DRAFT">Draft</option>
             <option value="REJECTED">Rejected</option>
           </select>
+
+          <button
+            type="button"
+            disabled={isCreating}
+            onClick={handleCreateQuotation}
+            className="h-8 px-3 rounded-md bg-primary hover:bg-[#1E3A8A] text-white font-label-md text-xs font-semibold flex items-center gap-1 shadow-sm transition-colors disabled:opacity-50"
+          >
+            <span className="material-symbols-outlined text-sm" data-icon="add">
+              add
+            </span>
+            <span>{isCreating ? "Creating..." : "New Quote"}</span>
+          </button>
         </div>
       </div>
 
@@ -129,18 +150,18 @@ export const QuotationsListTable: React.FC<QuotationsListTableProps> = ({
               <th className="py-2.5 px-space-base font-semibold">Quotation #</th>
               <th className="py-2.5 px-space-md font-semibold">Customer &amp; Account</th>
               <th className="py-2.5 px-space-md font-semibold">Owner</th>
-              <th className="py-2.5 px-space-md font-semibold text-right w-28">Total Value</th>
-              <th className="py-2.5 px-space-md font-semibold w-32">Risk Score</th>
-              <th className="py-2.5 px-space-md font-semibold w-36">Current Stage</th>
-              <th className="py-2.5 px-space-md font-semibold w-32">Status</th>
-              <th className="py-2.5 px-space-base font-semibold text-right w-28">Updated</th>
+              <th className="py-2.5 px-space-md font-semibold text-right">Total Value</th>
+              <th className="py-2.5 px-space-md font-semibold">Risk Score</th>
+              <th className="py-2.5 px-space-md font-semibold">Stage</th>
+              <th className="py-2.5 px-space-md font-semibold">Status</th>
+              <th className="py-2.5 px-space-base font-semibold text-right">Updated</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[#F1F5F9] font-body-md text-body-md">
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={8} className="py-12 text-center text-outline text-body-md">
-                  No quotations found.
+                <td colSpan={8} className="py-8 text-center text-outline text-body-md">
+                  No quotations found matching the filter criteria.
                 </td>
               </tr>
             ) : (
@@ -157,6 +178,7 @@ export const QuotationsListTable: React.FC<QuotationsListTableProps> = ({
                 return (
                   <tr
                     key={q.id}
+                    onClick={() => router.push(`/quotations/${q.quotationNumber}`)}
                     className="hover:bg-[#F8FAFC] transition-colors group cursor-pointer"
                   >
                     {/* Quotation Number Link */}
@@ -164,6 +186,7 @@ export const QuotationsListTable: React.FC<QuotationsListTableProps> = ({
                       <Link
                         href={`/quotations/${q.quotationNumber}`}
                         className="font-code-tabular text-body-md font-semibold text-primary hover:underline flex items-center gap-1"
+                        onClick={(e) => e.stopPropagation()}
                       >
                         <span>{q.quotationNumber}</span>
                         <span

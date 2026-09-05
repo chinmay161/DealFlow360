@@ -1,9 +1,25 @@
 import { prisma } from "@/lib/prisma";
 import { QuotationStatus, ApprovalStatus, ApprovalPriority, WorkflowStepStatus } from "@prisma/client";
 
+export type QuoteLineItemId = string;
+export type ProductId = string;
+export type QuotationId = string;
+
+export interface SerializedProductSummary {
+  id: ProductId;
+  sku: string;
+  name: string;
+  description: string | null;
+  unitPrice: number;
+  costPrice: number;
+  taxRate: number;
+}
+
 export interface SerializedQuoteLineItem {
-  id: string;
-  quotationId: string;
+  id: QuoteLineItemId;
+  quotationId: QuotationId;
+  productId: ProductId | null;
+  product?: SerializedProductSummary | null;
   productName: string;
   sku: string | null;
   quantity: number;
@@ -15,6 +31,62 @@ export interface SerializedQuoteLineItem {
   governanceStatus: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface QuoteLineItemInputRecord {
+  id: string;
+  quotationId: string;
+  productId?: string | null;
+  product?: {
+    id: string;
+    sku: string;
+    name: string;
+    description?: string | null;
+    unitPrice: unknown;
+    costPrice: unknown;
+    taxRate: unknown;
+  } | null;
+  productName: string;
+  sku?: string | null;
+  quantity: number;
+  unitPrice: unknown;
+  discountPercent: unknown;
+  discountLimitPercent?: unknown;
+  estimatedMarginPercent?: unknown;
+  lineTotal: unknown;
+  governanceStatus?: string | null;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+}
+
+export function serializeQuoteLineItem(li: QuoteLineItemInputRecord): SerializedQuoteLineItem {
+  return {
+    id: li.id,
+    quotationId: li.quotationId,
+    productId: li.productId ?? null,
+    product: li.product
+      ? {
+          id: li.product.id,
+          sku: li.product.sku,
+          name: li.product.name,
+          description: li.product.description ?? null,
+          unitPrice: Number(li.product.unitPrice),
+          costPrice: Number(li.product.costPrice),
+          taxRate: Number(li.product.taxRate),
+        }
+      : null,
+    productName: li.productName,
+    sku: li.sku ?? null,
+    quantity: li.quantity,
+    unitPrice: Number(li.unitPrice),
+    discountPercent: Number(li.discountPercent),
+    discountLimitPercent: li.discountLimitPercent != null ? Number(li.discountLimitPercent) : null,
+    estimatedMarginPercent: li.estimatedMarginPercent != null ? Number(li.estimatedMarginPercent) : null,
+    lineTotal: Number(li.lineTotal),
+    governanceStatus: li.governanceStatus ?? null,
+    createdAt: typeof li.createdAt === "string" ? li.createdAt : li.createdAt.toISOString(),
+    updatedAt: typeof li.updatedAt === "string" ? li.updatedAt : li.updatedAt.toISOString(),
+  };
 }
 
 export interface SerializedWorkflowStep {
@@ -177,6 +249,7 @@ export async function getQuotationByNumber(
         customer: true,
         owner: true,
         lineItems: {
+          include: { product: true },
           orderBy: { createdAt: "asc" },
         },
         approvals: {
@@ -224,21 +297,7 @@ export async function getQuotationByNumber(
       riskScore: q.riskScore,
       createdAt: q.createdAt.toISOString(),
       updatedAt: q.updatedAt.toISOString(),
-      lineItems: q.lineItems.map((li) => ({
-        id: li.id,
-        quotationId: li.quotationId,
-        productName: li.productName,
-        sku: li.sku,
-        quantity: li.quantity,
-        unitPrice: Number(li.unitPrice),
-        discountPercent: Number(li.discountPercent),
-        discountLimitPercent: li.discountLimitPercent ? Number(li.discountLimitPercent) : null,
-        estimatedMarginPercent: li.estimatedMarginPercent ? Number(li.estimatedMarginPercent) : null,
-        lineTotal: Number(li.lineTotal),
-        governanceStatus: li.governanceStatus,
-        createdAt: li.createdAt.toISOString(),
-        updatedAt: li.updatedAt.toISOString(),
-      })),
+      lineItems: q.lineItems.map(serializeQuoteLineItem),
       approvals: q.approvals.map((appr) => ({
         id: appr.id,
         status: appr.status,
@@ -301,6 +360,7 @@ export async function getQuotationWithLineItems(
         customer: true,
         owner: true,
         lineItems: {
+          include: { product: true },
           orderBy: { createdAt: "asc" },
         },
         approvals: {
@@ -351,21 +411,7 @@ export async function getQuotationWithLineItems(
       riskScore: q.riskScore,
       createdAt: q.createdAt.toISOString(),
       updatedAt: q.updatedAt.toISOString(),
-      lineItems: q.lineItems.map((li) => ({
-        id: li.id,
-        quotationId: li.quotationId,
-        productName: li.productName,
-        sku: li.sku,
-        quantity: li.quantity,
-        unitPrice: Number(li.unitPrice),
-        discountPercent: Number(li.discountPercent),
-        discountLimitPercent: li.discountLimitPercent ? Number(li.discountLimitPercent) : null,
-        estimatedMarginPercent: li.estimatedMarginPercent ? Number(li.estimatedMarginPercent) : null,
-        lineTotal: Number(li.lineTotal),
-        governanceStatus: li.governanceStatus,
-        createdAt: li.createdAt.toISOString(),
-        updatedAt: li.updatedAt.toISOString(),
-      })),
+      lineItems: q.lineItems.map(serializeQuoteLineItem),
       approvals: q.approvals.map((appr) => ({
         id: appr.id,
         status: appr.status,

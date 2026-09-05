@@ -1,20 +1,34 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { SerializedQuoteLineItem } from "@/lib/quotations";
+import {
+  addLineItemAction,
+  updateLineItemAction,
+  removeLineItemAction,
+  duplicateLineItemAction,
+  quickAddBundleAction,
+} from "@/lib/actions/quoteActions";
+import { getActiveProductsAction } from "@/lib/actions/lookupActions";
+import { formatCurrency } from "@/lib/currency";
 
 interface QuoteLineItemsTableProps {
+  quotationId?: string;
   lineItems?: SerializedQuoteLineItem[];
   currency?: string;
 }
 
-function formatCurrency(amount: number, currency = "USD"): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: currency,
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(amount);
+interface ProductOption {
+  id: string;
+  sku: string;
+  name: string;
+  description: string | null;
+  categoryName: string;
+  unitPrice: number;
+  costPrice: number;
+  taxRate: number;
+  totalStock: number;
 }
 
 function formatPercent(value: number | null | undefined): string {
@@ -23,223 +37,823 @@ function formatPercent(value: number | null | undefined): string {
 }
 
 export const QuoteLineItemsTable: React.FC<QuoteLineItemsTableProps> = ({
+  quotationId,
   lineItems = [],
-  currency = "USD",
+  currency = "INR",
 }) => {
-  const totalUnits = lineItems.reduce((acc, item) => acc + item.quantity, 0);
+  const router = useRouter();
+  const [items, setItems] = useState<SerializedQuoteLineItem[]>(lineItems);
+
+  useEffect(() => {
+    setItems(lineItems);
+  }, [lineItems]);
+
+  const totalUnits = items.reduce((acc, item) => acc + item.quantity, 0);
+
+  // Modals state
+  const [isProductModalOpen, setIsProductModalOpen] = useState(false);
+  const [isBundleModalOpen, setIsBundleModalOpen] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState<SerializedQuoteLineItem | null>(null);
+
+  // Product picker state
+  const [products, setProducts] = useState<ProductOption[]>([]);
+  const [productSearch, setProductSearch] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("ALL");
+  const [isLoadingProducts, setIsLoadingProducts] = useState(false);
+  const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
+  const [newQuantity, setNewQuantity] = useState(1);
+  const [newDiscount, setNewDiscount] = useState(0);
+
+  // Inline editing state
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [editDiscountVal, setEditDiscountVal] = useState<number>(0);
+  const [editQtyVal, setEditQtyVal] = useState<number>(1);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const openProductPicker = async () => {
+    setIsProductModalOpen(true);
+    if (products.length === 0) {
+      setIsLoadingProducts(true);
+      try {
+        const list = await getActiveProductsAction();
+        setProducts(list);
+      } catch (err) {
+        console.error("Failed to load products:", err);
+      } finally {
+        setIsLoadingProducts(false);
+      }
+    }
+  };
+
+  const handleAddProduct = async () => {
+    if (!quotationId || !selectedProductId) return;
+    setIsSubmitting(true);
+    try {
+      const res = await addLineItemAction({
+        quotationId,
+        productId: selectedProductId,
+        quantity: Number(newQuantity) || 1,
+        discountPercent: Number(newDiscount) || 0,
+      });
+      if (res?.success && res?.item) {
+        setItems((prev) => [...prev, res.item as SerializedQuoteLineItem]);
+      }
+      setIsProductModalOpen(false);
+      setSelectedProductId(null);
+      setNewQuantity(1);
+      setNewDiscount(0);
+      router.refresh();
+    } catch (err) {
+      console.error("Failed to add line item:", err);
+      router.refresh();
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleAddBundle = async (bundleType: "WORKSTATION_PRO" | "CLOUD_STARTER" | "COLLABORATION_SUITE") => {
+    if (!quotationId) return;
+    setIsSubmitting(true);
+    try {
+      const res = await quickAddBundleAction({
+        quotationId,
+        bundleType,
+      });
+      if (res?.success && res?.items) {
+        setItems((prev) => [...prev, ...(res.items as SerializedQuoteLineItem[])]);
+      }
+      setIsBundleModalOpen(false);
+      router.refresh();
+    } catch (err) {
+      console.error("Failed to add bundle:", err);
+      router.refresh();
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleQuantityChange = async (itemId: string, currentQty: number, delta: number) => {
+    const nextQty = Math.max(1, currentQty + delta);
+    if (nextQty === currentQty) return;
+
+    setItems((prev) =>
+      prev.map((it) =>
+        it.id === itemId
+          ? {
+              ...it,
+              quantity: nextQty,
+              lineTotal: nextQty * it.unitPrice * (1 - it.discountPercent / 100),
+            }
+          : it
+      )
+    );
+
+    try {
+      await updateLineItemAction({
+        lineItemId: itemId,
+        quantity: nextQty,
+      });
+      router.refresh();
+    } catch (err) {
+      console.error("Failed to update quantity:", err);
+      router.refresh();
+    }
+  };
+
+  const startEditItem = (item: SerializedQuoteLineItem) => {
+    setEditingItemId(item.id);
+    setEditDiscountVal(item.discountPercent);
+    setEditQtyVal(item.quantity);
+  };
+
+  const saveEditItem = async (itemId: string) => {
+    const qty = Number(editQtyVal) || 1;
+    const disc = Number(editDiscountVal) || 0;
+
+    setItems((prev) =>
+      prev.map((it) =>
+        it.id === itemId
+          ? {
+              ...it,
+              quantity: qty,
+              discountPercent: disc,
+              lineTotal: qty * it.unitPrice * (1 - disc / 100),
+            }
+          : it
+      )
+    );
+    setEditingItemId(null);
+
+    try {
+      await updateLineItemAction({
+        lineItemId: itemId,
+        quantity: qty,
+        discountPercent: disc,
+      });
+      router.refresh();
+    } catch (err) {
+      console.error("Failed to save line item:", err);
+      router.refresh();
+    }
+  };
+
+  const handleDeleteItem = async () => {
+    if (!itemToDelete) return;
+    const targetId = itemToDelete.id;
+    setItemToDelete(null);
+
+    setItems((prev) => prev.filter((it) => it.id !== targetId));
+
+    try {
+      await removeLineItemAction({ lineItemId: targetId });
+      router.refresh();
+    } catch (err) {
+      console.error("Failed to delete line item:", err);
+      router.refresh();
+    }
+  };
+
+  const handleDuplicateItem = async (itemId: string) => {
+    try {
+      const res = await duplicateLineItemAction(itemId);
+      if (res?.success && res?.item) {
+        setItems((prev) => [...prev, res.item as SerializedQuoteLineItem]);
+      }
+      router.refresh();
+    } catch (err) {
+      console.error("Failed to duplicate line item:", err);
+      router.refresh();
+    }
+  };
+
+  const categories = Array.from(new Set(products.map((p) => p.categoryName)));
+
+  const filteredProducts = products.filter((p) => {
+    const matchesSearch =
+      p.name.toLowerCase().includes(productSearch.toLowerCase()) ||
+      p.sku.toLowerCase().includes(productSearch.toLowerCase());
+    const matchesCat = selectedCategory === "ALL" || p.categoryName === selectedCategory;
+    return matchesSearch && matchesCat;
+  });
 
   return (
-    <div className="bg-white border border-[#E5E7EB] rounded-lg shadow-[0px_1px_2px_rgba(15,23,42,0.04)] overflow-hidden">
-      {/* Section Bar */}
-      <div className="px-space-base py-space-sm border-b border-[#E5E7EB] flex items-center justify-between bg-surface-bright">
-        <div className="flex items-center gap-2">
-          <span className="font-title-md text-title-md font-semibold text-on-surface">
-            Line Items &amp; Commercial Structure
-          </span>
-          <span className="px-2 py-0.5 text-label-sm font-semibold rounded-full bg-surface-container-high text-primary">
-            {lineItems.length} Products
-          </span>
+    <>
+      <div className="bg-white border border-[#E5E7EB] rounded-lg shadow-[0px_1px_2px_rgba(15,23,42,0.04)] overflow-hidden">
+        {/* Section Bar */}
+        <div className="px-space-base py-space-sm border-b border-[#E5E7EB] flex items-center justify-between bg-surface-bright">
+          <div className="flex items-center gap-2">
+            <span className="font-title-md text-title-md font-semibold text-on-surface">
+              Line Items &amp; Commercial Structure
+            </span>
+            <span className="px-2 py-0.5 text-label-sm font-semibold rounded-full bg-surface-container-high text-primary">
+              {items.length} Products
+            </span>
+          </div>
+          <div className="flex items-center gap-2 text-label-sm text-outline">
+            <span>
+              Currency: <strong>{currency} ($)</strong>
+            </span>
+          </div>
         </div>
-        <div className="flex items-center gap-2 text-label-sm text-outline">
-          <span>
-            Currency: <strong>{currency} ($)</strong>
-          </span>
-        </div>
-      </div>
 
-      {/* Enterprise Data Grid with Margin Column */}
-      <div className="overflow-x-auto">
-        <table className="w-full text-left border-collapse">
-          <thead>
-            <tr className="bg-[#F8F9FA] border-b border-[#E5E7EB] h-9 font-label-sm text-label-sm text-[#475569] uppercase tracking-wider">
-              <th className="py-2.5 px-space-base font-semibold">Item &amp; SKU</th>
-              <th className="py-2.5 px-space-md font-semibold text-right w-20">Qty</th>
-              <th className="py-2.5 px-space-md font-semibold text-right w-28">Unit Price</th>
-              <th className="py-2.5 px-space-md font-semibold text-right w-28">Discount (%)</th>
-              <th className="py-2.5 px-space-md font-semibold text-right w-24">Limit (%)</th>
-              <th className="py-2.5 px-space-md font-semibold text-right w-36">Est. Margin</th>
-              <th className="py-2.5 px-space-md font-semibold text-right w-32">Line Total</th>
-              <th className="py-2.5 px-space-base font-semibold w-44">Governance Status</th>
-              <th className="py-2.5 px-space-md font-semibold text-center w-24">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-[#F1F5F9] font-body-md text-body-md">
-            {lineItems.length === 0 ? (
-              <tr>
-                <td colSpan={9} className="py-8 text-center text-outline text-body-md">
-                  No line items configured for this quotation.
-                </td>
+        {/* Enterprise Data Grid */}
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-[#F8F9FA] border-b border-[#E5E7EB] h-9 font-label-sm text-label-sm text-[#475569] uppercase tracking-wider">
+                <th className="py-2.5 px-space-base font-semibold">Item &amp; SKU</th>
+                <th className="py-2.5 px-space-md font-semibold text-right w-24">Qty</th>
+                <th className="py-2.5 px-space-md font-semibold text-right w-28">Unit Price</th>
+                <th className="py-2.5 px-space-md font-semibold text-right w-32">Discount (%)</th>
+                <th className="py-2.5 px-space-md font-semibold text-right w-24">Limit (%)</th>
+                <th className="py-2.5 px-space-md font-semibold text-right w-36">Est. Margin</th>
+                <th className="py-2.5 px-space-md font-semibold text-right w-32">Line Total</th>
+                <th className="py-2.5 px-space-base font-semibold w-44">Governance Status</th>
+                <th className="py-2.5 px-space-md font-semibold text-center w-28">Actions</th>
               </tr>
-            ) : (
-              lineItems.map((item) => {
-                const isOverLimit =
-                  (item.governanceStatus && item.governanceStatus.toLowerCase().includes("over")) ||
-                  (item.discountLimitPercent !== null && item.discountPercent > item.discountLimitPercent);
+            </thead>
+            <tbody className="divide-y divide-[#F1F5F9] font-body-md text-body-md">
+              {items.length === 0 ? (
+                <tr>
+                  <td colSpan={9} className="py-8 text-center text-outline text-body-md">
+                    No line items configured for this quotation.
+                  </td>
+                </tr>
+              ) : (
+                items.map((item) => {
+                  const isOverLimit =
+                    (item.governanceStatus && item.governanceStatus.toLowerCase().includes("over")) ||
+                    (item.discountLimitPercent !== null && item.discountPercent > item.discountLimitPercent);
 
-                const marginPercent = item.estimatedMarginPercent ?? 0;
-                const dollarMargin = item.lineTotal * (marginPercent / 100);
+                  const marginPercent = item.estimatedMarginPercent ?? 0;
+                  const marginAmount = item.lineTotal * (marginPercent / 100);
+                  const isEditing = editingItemId === item.id;
 
-                return (
-                  <tr
-                    key={item.id}
-                    className={`transition-colors group ${
-                      isOverLimit
-                        ? "bg-[#FFFDF5]/40 hover:bg-[#FFFDF5]"
-                        : "hover:bg-[#F8FAFC]"
-                    }`}
-                  >
-                    {/* Item & SKU */}
-                    <td className="py-3 px-space-base">
-                      <div className="font-title-md text-body-md font-semibold text-on-surface flex items-center gap-1.5">
-                        <span>{item.productName}</span>
-                        {isOverLimit && (
-                          <span
-                            className="material-symbols-outlined text-[#D97706] text-xs"
-                            title="Discount exceeds standard limit"
-                            data-icon="warning"
-                          >
-                            warning
-                          </span>
-                        )}
-                      </div>
-                      <div className="font-code-tabular text-[11px] text-outline">
-                        SKU: {item.sku || "N/A"}
-                      </div>
-                    </td>
-
-                    {/* Quantity */}
-                    <td className="py-3 px-space-md text-right font-code-tabular tnum font-medium text-on-surface">
-                      {item.quantity}
-                    </td>
-
-                    {/* Unit Price */}
-                    <td className="py-3 px-space-md text-right font-code-tabular tnum text-on-surface">
-                      {formatCurrency(item.unitPrice, currency)}
-                    </td>
-
-                    {/* Discount (%) */}
-                    <td
-                      className={`py-3 px-space-md text-right font-code-tabular tnum ${
+                  return (
+                    <tr
+                      key={item.id}
+                      className={`transition-colors group ${
                         isOverLimit
-                          ? "font-bold text-[#B45309]"
-                          : "font-semibold text-[#1E40AF]"
+                          ? "bg-[#FFFDF5]/40 hover:bg-[#FFFDF5]"
+                          : "hover:bg-[#F8FAFC]"
                       }`}
                     >
-                      {formatPercent(item.discountPercent)}
-                    </td>
+                      {/* Item & SKU */}
+                      <td className="py-3 px-space-base">
+                        <div className="font-title-md text-body-md font-semibold text-on-surface flex items-center gap-1.5">
+                          <span>{item.productName}</span>
+                          {isOverLimit && (
+                            <span
+                              className="material-symbols-outlined text-[#D97706] text-xs"
+                              title="Discount exceeds standard limit"
+                              data-icon="warning"
+                            >
+                              warning
+                            </span>
+                          )}
+                        </div>
+                        <div className="font-code-tabular text-[11px] text-outline">
+                          SKU: {item.sku || "N/A"}
+                        </div>
+                      </td>
 
-                    {/* Limit (%) */}
-                    <td className="py-3 px-space-md text-right font-code-tabular tnum text-outline">
-                      {formatPercent(item.discountLimitPercent)}
-                    </td>
+                      {/* Quantity with +/- controls */}
+                      <td className="py-3 px-space-md text-right font-code-tabular tnum font-medium text-on-surface">
+                        {isEditing ? (
+                          <input
+                            type="number"
+                            min="1"
+                            value={editQtyVal}
+                            onChange={(e) => setEditQtyVal(Math.max(1, parseInt(e.target.value) || 1))}
+                            className="w-16 px-1.5 py-0.5 border border-[#D1D5DB] rounded text-right font-code-tabular text-body-sm"
+                          />
+                        ) : (
+                          <div className="inline-flex items-center gap-1 justify-end">
+                            <button
+                              type="button"
+                              onClick={() => handleQuantityChange(item.id, item.quantity, -1)}
+                              disabled={item.quantity <= 1}
+                              className="w-5 h-5 flex items-center justify-center rounded border border-[#E5E7EB] text-outline hover:text-on-surface hover:bg-[#F1F5F9] disabled:opacity-40"
+                              title="Decrease quantity"
+                            >
+                              -
+                            </button>
+                            <span className="w-8 text-center">{item.quantity}</span>
+                            <button
+                              type="button"
+                              onClick={() => handleQuantityChange(item.id, item.quantity, 1)}
+                              className="w-5 h-5 flex items-center justify-center rounded border border-[#E5E7EB] text-outline hover:text-on-surface hover:bg-[#F1F5F9]"
+                              title="Increase quantity"
+                            >
+                              +
+                            </button>
+                          </div>
+                        )}
+                      </td>
 
-                    {/* Est. Margin */}
-                    <td className="py-3 px-space-md text-right font-code-tabular tnum">
-                      <span
-                        className={`font-semibold ${
-                          isOverLimit ? "text-[#B45309]" : "text-[#065F46]"
+                      {/* Unit Price */}
+                      <td className="py-3 px-space-md text-right font-code-tabular tnum text-on-surface">
+                        {formatCurrency(item.unitPrice, currency)}
+                      </td>
+
+                      {/* Discount (%) with quick edit */}
+                      <td
+                        className={`py-3 px-space-md text-right font-code-tabular tnum ${
+                          isOverLimit
+                            ? "font-bold text-[#B45309]"
+                            : "font-semibold text-[#1E40AF]"
                         }`}
                       >
-                        {Math.round(marginPercent)}%
-                      </span>
-                      <span className="text-outline text-xs block font-normal">
-                        {formatCurrency(dollarMargin, currency)}
-                      </span>
-                    </td>
-
-                    {/* Line Total */}
-                    <td className="py-3 px-space-md text-right font-code-tabular tnum font-bold text-on-surface">
-                      {formatCurrency(item.lineTotal, currency)}
-                    </td>
-
-                    {/* Governance Status */}
-                    <td className="py-3 px-space-base">
-                      {isOverLimit ? (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-label-sm font-semibold bg-[#FFFBEB] text-[#92400E] border border-[#FDE68A]">
+                        {isEditing ? (
+                          <div className="inline-flex items-center gap-1">
+                            <input
+                              type="number"
+                              min="0"
+                              max="100"
+                              step="0.5"
+                              value={editDiscountVal}
+                              onChange={(e) => setEditDiscountVal(Math.max(0, Math.min(100, parseFloat(e.target.value) || 0)))}
+                              className="w-16 px-1.5 py-0.5 border border-[#D1D5DB] rounded text-right font-code-tabular text-body-sm"
+                            />
+                            <span>%</span>
+                          </div>
+                        ) : (
                           <span
-                            className="material-symbols-outlined text-[13px]"
-                            data-icon="priority_high"
+                            onClick={() => startEditItem(item)}
+                            className="cursor-pointer hover:underline"
+                            title="Click to edit discount"
                           >
-                            priority_high
+                            {formatPercent(item.discountPercent)}
                           </span>
-                          {item.governanceStatus || "Over Limit"}
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-label-sm font-semibold bg-[#ECFDF5] text-[#065F46] border border-[#A7F3D0]">
-                          <span
-                            className="material-symbols-outlined text-[13px]"
-                            data-icon="check_circle"
-                          >
-                            check_circle
-                          </span>
-                          {item.governanceStatus || "Within Limit"}
-                        </span>
-                      )}
-                    </td>
+                        )}
+                      </td>
 
-                    {/* Actions */}
-                    <td className="py-3 px-space-md text-center">
-                      <div className="flex items-center justify-center gap-1">
-                        <button
-                          type="button"
-                          className="p-1 rounded text-outline hover:text-primary hover:bg-surface-container transition-colors"
-                          title="Edit Item"
-                        >
-                          <span className="material-symbols-outlined text-sm" data-icon="edit">
-                            edit
-                          </span>
-                        </button>
-                        <button
-                          type="button"
-                          className="p-1 rounded text-outline hover:text-error hover:bg-red-50 transition-colors"
-                          title="Delete Item"
-                        >
-                          <span className="material-symbols-outlined text-sm" data-icon="delete">
-                            delete
-                          </span>
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
-      </div>
+                      {/* Limit (%) */}
+                      <td className="py-3 px-space-md text-right font-code-tabular tnum text-outline">
+                        {formatPercent(item.discountLimitPercent)}
+                      </td>
 
-      {/* Table Actions Footer Row */}
-      <div className="p-space-sm bg-[#F8F9FA] border-t border-[#E5E7EB] flex items-center justify-between">
-        <div className="flex items-center gap-space-sm">
-          <button
-            type="button"
-            className="h-8 px-3 rounded-md bg-white border border-[#D1D5DB] text-on-surface font-label-md text-label-md font-semibold hover:bg-surface-bright flex items-center gap-1.5 transition-colors shadow-sm"
-          >
-            <span className="material-symbols-outlined text-sm text-primary" data-icon="add">
-              add
-            </span>
-            <span>+ Add Product Line Item</span>
-          </button>
-          <button
-            type="button"
-            className="h-8 px-3 rounded-md bg-white border border-[#D1D5DB] text-on-surface-variant font-label-md text-label-md font-medium hover:bg-surface-bright flex items-center gap-1.5 transition-colors"
-          >
-            <span
-              className="material-symbols-outlined text-sm"
-              data-icon="library_add"
+                      {/* Est. Margin */}
+                      <td className="py-3 px-space-md text-right font-code-tabular tnum">
+                        <span
+                          className={`font-semibold ${
+                            isOverLimit ? "text-[#B45309]" : "text-[#065F46]"
+                          }`}
+                        >
+                          {Math.round(marginPercent)}%
+                        </span>
+                        <span className="text-outline text-xs block font-normal">
+                          {formatCurrency(marginAmount, currency)}
+                        </span>
+                      </td>
+
+                      {/* Line Total */}
+                      <td className="py-3 px-space-md text-right font-code-tabular tnum font-bold text-on-surface">
+                        {formatCurrency(item.lineTotal, currency)}
+                      </td>
+
+                      {/* Governance Status */}
+                      <td className="py-3 px-space-base">
+                        {isOverLimit ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-label-sm font-semibold bg-[#FFFBEB] text-[#92400E] border border-[#FDE68A]">
+                            <span
+                              className="material-symbols-outlined text-[13px]"
+                              data-icon="priority_high"
+                            >
+                              priority_high
+                            </span>
+                            {item.governanceStatus || "Over Limit"}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-label-sm font-semibold bg-[#ECFDF5] text-[#065F46] border border-[#A7F3D0]">
+                            <span
+                              className="material-symbols-outlined text-[13px]"
+                              data-icon="check_circle"
+                            >
+                              check_circle
+                            </span>
+                            {item.governanceStatus || "Within Limit"}
+                          </span>
+                        )}
+                      </td>
+
+                      {/* Actions */}
+                      <td className="py-3 px-space-md text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          {isEditing ? (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => saveEditItem(item.id)}
+                                className="p-1 rounded text-primary hover:bg-blue-50 transition-colors"
+                                title="Save changes"
+                              >
+                                <span className="material-symbols-outlined text-sm" data-icon="check">
+                                  check
+                                </span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setEditingItemId(null)}
+                                className="p-1 rounded text-outline hover:bg-gray-100 transition-colors"
+                                title="Cancel"
+                              >
+                                <span className="material-symbols-outlined text-sm" data-icon="close">
+                                  close
+                                </span>
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => startEditItem(item)}
+                                className="p-1 rounded text-outline hover:text-primary hover:bg-surface-container transition-colors"
+                                title="Edit Item"
+                              >
+                                <span className="material-symbols-outlined text-sm" data-icon="edit">
+                                  edit
+                                </span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDuplicateItem(item.id)}
+                                className="p-1 rounded text-outline hover:text-primary hover:bg-surface-container transition-colors"
+                                title="Duplicate Item"
+                              >
+                                <span className="material-symbols-outlined text-sm" data-icon="content_copy">
+                                  content_copy
+                                </span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setItemToDelete(item)}
+                                className="p-1 rounded text-outline hover:text-error hover:bg-red-50 transition-colors"
+                                title="Delete Item"
+                              >
+                                <span className="material-symbols-outlined text-sm" data-icon="delete">
+                                  delete
+                                </span>
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Table Actions Footer Row */}
+        <div className="p-space-sm bg-[#F8F9FA] border-t border-[#E5E7EB] flex items-center justify-between">
+          <div className="flex items-center gap-space-sm">
+            <button
+              type="button"
+              onClick={openProductPicker}
+              className="h-8 px-3 rounded-md bg-white border border-[#D1D5DB] text-on-surface font-label-md text-label-md font-semibold hover:bg-surface-bright flex items-center gap-1.5 transition-colors shadow-sm"
             >
-              library_add
+              <span className="material-symbols-outlined text-sm text-primary" data-icon="add">
+                add
+              </span>
+              <span>+ Add Product Line Item</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsBundleModalOpen(true)}
+              className="h-8 px-3 rounded-md bg-white border border-[#D1D5DB] text-on-surface-variant font-label-md text-label-md font-medium hover:bg-surface-bright flex items-center gap-1.5 transition-colors"
+            >
+              <span
+                className="material-symbols-outlined text-sm"
+                data-icon="library_add"
+              >
+                library_add
+              </span>
+              <span>Quick Add Bundle</span>
+            </button>
+          </div>
+          <div className="font-body-sm text-body-sm text-outline">
+            <span>
+              Lines: <strong>{items.length}</strong> | Total Unit Count:{" "}
+              <strong>{totalUnits} Units</strong>
             </span>
-            <span>Quick Add Bundle</span>
-          </button>
-        </div>
-        <div className="font-body-sm text-body-sm text-outline">
-          <span>
-            Lines: <strong>{lineItems.length}</strong> | Total Unit Count:{" "}
-            <strong>{totalUnits} Units</strong>
-          </span>
+          </div>
         </div>
       </div>
-    </div>
+
+      {/* Add Product Dialog */}
+      {isProductModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="bg-white border border-[#E5E7EB] rounded-lg shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[85vh]">
+            <div className="px-5 py-4 border-b border-[#E5E7EB] flex items-center justify-between bg-[#F8F9FA]">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-primary text-xl" data-icon="inventory_2">
+                  inventory_2
+                </span>
+                <h3 className="font-title-md text-title-md font-semibold text-on-surface">
+                  Add Product Line Item
+                </h3>
+              </div>
+              <button
+                onClick={() => setIsProductModalOpen(false)}
+                className="text-outline hover:text-on-surface p-1 rounded-md"
+              >
+                <span className="material-symbols-outlined text-base" data-icon="close">
+                  close
+                </span>
+              </button>
+            </div>
+
+            {/* Filter & Search */}
+            <div className="p-4 border-b border-[#E5E7EB] space-y-3">
+              <div className="relative">
+                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-sm" data-icon="search">
+                  search
+                </span>
+                <input
+                  type="text"
+                  placeholder="Search products by title or SKU..."
+                  value={productSearch}
+                  onChange={(e) => setProductSearch(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2 border border-[#D1D5DB] rounded-md text-body-sm text-on-surface focus:outline-none focus:ring-1 focus:ring-primary"
+                  autoFocus
+                />
+              </div>
+
+              {/* Category tabs */}
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setSelectedCategory("ALL")}
+                  className={`px-2.5 py-1 rounded-full font-medium transition-colors ${
+                    selectedCategory === "ALL"
+                      ? "bg-primary text-white"
+                      : "bg-[#F1F5F9] text-on-surface hover:bg-[#E2E8F0]"
+                  }`}
+                >
+                  All Categories
+                </button>
+                {categories.map((cat) => (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => setSelectedCategory(cat)}
+                    className={`px-2.5 py-1 rounded-full font-medium whitespace-nowrap transition-colors ${
+                      selectedCategory === cat
+                        ? "bg-primary text-white"
+                        : "bg-[#F1F5F9] text-on-surface hover:bg-[#E2E8F0]"
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Products List */}
+            <div className="overflow-y-auto flex-1 p-3 divide-y divide-[#F1F5F9]">
+              {isLoadingProducts ? (
+                <div className="py-12 text-center text-outline text-body-sm">
+                  Loading product catalog from PostgreSQL...
+                </div>
+              ) : filteredProducts.length === 0 ? (
+                <div className="py-12 text-center text-outline text-body-sm">
+                  No products found.
+                </div>
+              ) : (
+                filteredProducts.map((p) => {
+                  const isSelected = selectedProductId === p.id;
+                  return (
+                    <div
+                      key={p.id}
+                      onClick={() => setSelectedProductId(p.id)}
+                      className={`p-3 rounded-md flex items-center justify-between cursor-pointer transition-colors ${
+                        isSelected
+                          ? "bg-[#EFF6FF] border border-[#BFDBFE]"
+                          : "hover:bg-[#F8FAFC]"
+                      }`}
+                    >
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-title-md text-body-md font-semibold text-on-surface">
+                            {p.name}
+                          </span>
+                          <span className="font-code-tabular text-xs text-outline">
+                            SKU: {p.sku}
+                          </span>
+                        </div>
+                        <div className="font-body-sm text-[11px] text-outline mt-0.5">
+                          {p.categoryName} • Stock: {p.totalStock} units available across hubs
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-code-tabular text-body-md font-bold text-on-surface">
+                          ${p.unitPrice.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                        </div>
+                        <div className="font-body-sm text-[11px] text-outline">
+                          Cost base: ${p.costPrice.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Selected Product Configuration */}
+            {selectedProductId && (
+              <div className="p-4 bg-[#F8FAFC] border-t border-[#E5E7EB] flex items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-outline uppercase mb-1">
+                      Quantity
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={newQuantity}
+                      onChange={(e) => setNewQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                      className="w-20 px-2 py-1 border border-[#D1D5DB] rounded text-body-sm font-code-tabular"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-outline uppercase mb-1">
+                      Discount %
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.5"
+                      value={newDiscount}
+                      onChange={(e) => setNewDiscount(Math.max(0, Math.min(100, parseFloat(e.target.value) || 0)))}
+                      className="w-20 px-2 py-1 border border-[#D1D5DB] rounded text-body-sm font-code-tabular"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsProductModalOpen(false)}
+                    className="h-9 px-4 rounded-md border border-[#D1D5DB] bg-white text-on-surface font-label-md text-label-md font-semibold hover:bg-surface-bright"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isSubmitting}
+                    onClick={handleAddProduct}
+                    className="h-9 px-5 rounded-md bg-primary hover:bg-[#1E3A8A] text-white font-label-md text-label-md font-semibold flex items-center gap-1.5 shadow-sm disabled:opacity-50"
+                  >
+                    <span className="material-symbols-outlined text-sm" data-icon="add">
+                      add
+                    </span>
+                    <span>Add to Quotation</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Quick Add Bundle Dialog */}
+      {isBundleModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="bg-white border border-[#E5E7EB] rounded-lg shadow-xl w-full max-w-xl overflow-hidden flex flex-col">
+            <div className="px-5 py-4 border-b border-[#E5E7EB] flex items-center justify-between bg-[#F8F9FA]">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-primary text-xl" data-icon="library_add">
+                  library_add
+                </span>
+                <h3 className="font-title-md text-title-md font-semibold text-on-surface">
+                  Select Pre-Configured Bundle
+                </h3>
+              </div>
+              <button
+                onClick={() => setIsBundleModalOpen(false)}
+                className="text-outline hover:text-on-surface p-1 rounded-md"
+              >
+                <span className="material-symbols-outlined text-base" data-icon="close">
+                  close
+                </span>
+              </button>
+            </div>
+
+            <div className="p-4 space-y-3">
+              {/* Bundle 1 */}
+              <div
+                onClick={() => handleAddBundle("WORKSTATION_PRO")}
+                className="p-4 border border-[#E5E7EB] rounded-lg hover:border-primary/50 hover:bg-[#F8FAFC] cursor-pointer transition-all"
+              >
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h4 className="font-title-md text-body-md font-semibold text-on-surface">
+                      Workstation Executive Bundle
+                    </h4>
+                    <p className="font-body-sm text-xs text-outline mt-1">
+                      Includes 2x Thunderbolt 4 Docks, 2x 100W Dual Chargers, and 2x 3-Year Care Plans.
+                    </p>
+                  </div>
+                  <span className="px-2 py-0.5 rounded text-xs font-semibold bg-[#ECFDF5] text-[#065F46] border border-[#A7F3D0]">
+                    Save 10% Bundle
+                  </span>
+                </div>
+              </div>
+
+              {/* Bundle 2 */}
+              <div
+                onClick={() => handleAddBundle("CLOUD_STARTER")}
+                className="p-4 border border-[#E5E7EB] rounded-lg hover:border-primary/50 hover:bg-[#F8FAFC] cursor-pointer transition-all"
+              >
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h4 className="font-title-md text-body-md font-semibold text-on-surface">
+                      Cloud Migration Foundation
+                    </h4>
+                    <p className="font-body-sm text-xs text-outline mt-1">
+                      Includes Cloud Architecture Migration Service and 3-Year Enterprise Care Plan Pro.
+                    </p>
+                  </div>
+                  <span className="px-2 py-0.5 rounded text-xs font-semibold bg-[#EFF6FF] text-[#1E40AF] border border-[#BFDBFE]">
+                    Recommended
+                  </span>
+                </div>
+              </div>
+
+              {/* Bundle 3 */}
+              <div
+                onClick={() => handleAddBundle("COLLABORATION_SUITE")}
+                className="p-4 border border-[#E5E7EB] rounded-lg hover:border-primary/50 hover:bg-[#F8FAFC] cursor-pointer transition-all"
+              >
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h4 className="font-title-md text-body-md font-semibold text-on-surface">
+                      Dual Display Setup
+                    </h4>
+                    <p className="font-body-sm text-xs text-outline mt-1">
+                      Includes Universal Docking Station and 2x UltraSharp 27&quot; 4K Displays.
+                    </p>
+                  </div>
+                  <span className="px-2 py-0.5 rounded text-xs font-semibold bg-[#FFFBEB] text-[#92400E] border border-[#FDE68A]">
+                    Popular
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-3 bg-[#F8F9FA] border-t border-[#E5E7EB] flex justify-end">
+              <button
+                type="button"
+                onClick={() => setIsBundleModalOpen(false)}
+                className="h-8 px-4 rounded-md border border-[#D1D5DB] bg-white text-on-surface font-label-md text-label-md font-semibold hover:bg-surface-bright"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {itemToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="bg-white border border-[#E5E7EB] rounded-lg shadow-xl w-full max-w-md overflow-hidden">
+            <div className="p-5">
+              <div className="flex items-center gap-3 text-[#E11D48] mb-3">
+                <span className="material-symbols-outlined text-2xl" data-icon="delete_forever">
+                  delete_forever
+                </span>
+                <h3 className="font-title-md text-title-md font-semibold text-on-surface">
+                  Remove Line Item?
+                </h3>
+              </div>
+              <p className="font-body-sm text-body-sm text-outline">
+                Are you sure you want to remove <strong>{itemToDelete.productName}</strong> from this quotation? This will immediately update quotation totals, margin, and risk score.
+              </p>
+            </div>
+            <div className="p-3 bg-[#F8F9FA] border-t border-[#E5E7EB] flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setItemToDelete(null)}
+                className="h-8 px-4 rounded-md border border-[#D1D5DB] bg-white text-on-surface font-label-md text-label-md font-semibold hover:bg-surface-bright"
+              >
+                Keep Item
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteItem}
+                className="h-8 px-4 rounded-md bg-[#E11D48] hover:bg-[#BE123C] text-white font-label-md text-label-md font-semibold shadow-sm"
+              >
+                Confirm Remove
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 };

@@ -162,7 +162,7 @@ export const ApprovalDetails: React.FC<ApprovalDetailsProps> = ({
             <h3 className="font-title-md text-body-md font-semibold text-on-surface">
               Financial Overview
             </h3>
-            <span className="text-[11px] font-label-sm text-outline">USD ($)</span>
+            <span className="text-[11px] font-label-sm text-outline">INR (₹)</span>
           </div>
 
           <div className="space-y-1.5 font-body-sm text-xs">
@@ -179,7 +179,7 @@ export const ApprovalDetails: React.FC<ApprovalDetailsProps> = ({
               </span>
             </div>
             <div className="flex items-center justify-between text-on-surface-variant">
-              <span>Estimated Tax</span>
+              <span>Estimated GST</span>
               <span className="font-code-tabular tnum text-on-surface font-medium">
                 {approval.financials.estimatedTax}
               </span>
