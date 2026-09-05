@@ -12,6 +12,9 @@ import { CounterfactualCard } from "@/components/quotations/CounterfactualCard";
 import { DecisionTraceModal } from "@/components/quotations/DecisionTraceModal";
 
 import { formatCurrency } from "@/lib/currency";
+import { QueryProvider } from "@/components/providers/QueryProvider";
+import { QuotationInventoryWidget } from "@/features/inventory/components/QuotationInventoryWidget";
+import { RuleEngineInventoryStatusWidget } from "@/features/inventory/components/RuleEngineInventoryStatusWidget";
 
 interface QuotationDetailViewProps {
   quotation: SerializedQuotationDetail;
@@ -77,6 +80,19 @@ export const QuotationDetailView: React.FC<QuotationDetailViewProps> = ({ quotat
         />
 
         <RecommendationSection quotationId={quotation.id} />
+
+        {/* Live Regional Inventory & Availability Visibility */}
+        <QueryProvider>
+          <QuotationInventoryWidget
+            quotationId={quotation.id}
+            quotationNumber={quotation.quotationNumber}
+            lineItems={quotation.lineItems}
+          />
+          <RuleEngineInventoryStatusWidget
+            quotationId={quotation.id}
+            quotationNumber={quotation.quotationNumber}
+          />
+        </QueryProvider>
 
         {/* Counterfactual Margin Optimization Engine */}
         <CounterfactualCard quotationId={quotation.id} />
