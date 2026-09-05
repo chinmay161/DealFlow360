@@ -82,12 +82,35 @@ From the `frontend/` directory:
 
 ## 4. Running the Application
 
+### Option A: Run Both Services Concurrently (Recommended)
+
+From the repository root:
+
 ```bash
-cd frontend
 npm run dev
 ```
+
+This starts both:
+- **Frontend (Next.js):** [http://localhost:3000](http://localhost:3000)
+- **Backend (Express):** [http://localhost:5000](http://localhost:5000) *(proxied automatically via `http://localhost:3000/api/v1/*`)*
+
+### Option B: Run Services Individually
+
+- **Frontend:**
+  ```bash
+  npm run dev:frontend    # or: cd frontend && npm run dev
+  ```
+- **Backend:**
+  ```bash
+  npm run dev:backend     # or: cd backend && npm run dev
+  ```
+
+---
+
+## 5. Application URLs
 
 - **Quotation Builder:** [http://localhost:3000](http://localhost:3000)
 - **Executive Dashboard:** [http://localhost:3000/dashboard](http://localhost:3000/dashboard)
 - **Approvals Center:** [http://localhost:3000/approvals](http://localhost:3000/approvals)
 - **Database & Backend Health Check:** [http://localhost:3000/api/health](http://localhost:3000/api/health)
+
