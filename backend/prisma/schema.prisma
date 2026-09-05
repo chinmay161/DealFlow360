@@ -1,5 +1,27 @@
+// ============================================================================
+// DealFlow360 — Prisma Schema
+// PostgreSQL 16 · Prisma ORM · TypeScript / Express
+//
+// Design notes
+// ─────────────
+// • UUID v4 primary keys across all models.
+// • Decimal(18,4) for financial values — 4 decimal places avoid rounding
+//   errors common with float and are wide enough for currency sub-units.
+// • Json columns are used ONLY for truly dynamic / schema-less payloads
+//   (audit snapshots, rule-evaluation inputs).
+// • Every model carries createdAt + updatedAt unless explicitly noted.
+// • Relation onDelete rules:
+//     Cascade  → child records are meaningless without the parent
+//     Restrict → deletion must be explicitly handled by business logic
+//     SetNull  → soft de-referencing (e.g. deleted user keeps the log)
+// • Indexes target the columns most likely to appear in WHERE / ORDER BY
+//   clauses: status fields, foreign keys, SKU, quote/invoice numbers, dates.
+// ============================================================================
+
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  // Enable Decimal.js integration and JSON typing helpers
+  previewFeatures = ["fullTextSearchPostgres"]
 }
 
 datasource db {
@@ -7,18 +29,826 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum UserRole {
+// ──────────────────────────────────────────────────────────────────────────────
+// Enumerations
+// ──────────────────────────────────────────────────────────────────────────────
+
+enum RoleType {
   ADMIN
   SALES_REP
-  APPROVER
+  MANAGER
+  FINANCE
   CUSTOMER
 }
 
+enum CustomerTier {
+  BRONZE
+  SILVER
+  GOLD
+}
+
+enum CustomerStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum QuotationStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  SENT
+  ACCEPTED
+  EXPIRED
+  CANCELLED
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  ESCALATED
+}
+
+enum ApprovalAction {
+  APPROVE
+  REJECT
+  ESCALATE
+  REQUEST_CHANGES
+}
+
+enum ShipmentStatus {
+  PENDING
+  PICKED
+  PACKED
+  SHIPPED
+  IN_TRANSIT
+  DELIVERED
+  CANCELLED
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PAID
+  OVERDUE
+  CANCELLED
+  REFUNDED
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAUSED
+  CANCELLED
+  EXPIRED
+  TRIALING
+}
+
+enum NotificationType {
+  EMAIL
+  SMS
+  WHATSAPP
+  IN_APP
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  DELIVERED
+  FAILED
+  READ
+}
+
+enum ReservationStatus {
+  ACTIVE
+  RELEASED
+  EXPIRED
+  FULFILLED
+}
+
+enum DiscountType {
+  PERCENTAGE
+  FIXED_AMOUNT
+  TIERED
+  VOLUME
+}
+
+enum BillingInterval {
+  MONTHLY
+  QUARTERLY
+  YEARLY
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  LOGIN
+  LOGOUT
+  APPROVE
+  REJECT
+  EXPORT
+}
+
+/// Outcome of an individual rule evaluation in the Decision Trace.
+enum RuleOutcome {
+  PASS
+  FAIL
+  WARN
+  SKIP
+}
+
+/// Severity level for detected anomalies.
+enum AnomalySeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+/// Status of anomaly review.
+enum AnomalyStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+  FALSE_POSITIVE
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Authentication & Authorization
+// ──────────────────────────────────────────────────────────────────────────────
+
+/// Roles are a separate entity so the system can support role-based access
+/// control (RBAC) with future extension to permissions / policies without
+/// altering the User model.
+model Role {
+  id          String   @id @default(uuid())
+  name        RoleType @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users User[]
+}
+
 model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  firstName    String
+  lastName     String
+  phone        String?
+  avatarUrl    String?
+  isActive     Boolean  @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // ── Relations ──
+  roleId String
+  role   Role   @relation(fields: [roleId], references: [id], onDelete: Restrict)
+
+  // Outbound relations (User as FK target)
+  quotations         Quotation[]         @relation("QuotationSalesRep")
+  approvals          Approval[]          @relation("ApprovalApprover")
+  notifications      Notification[]
+  auditLogs          AuditLog[]
+  subscriptions      Subscription[]      @relation("SubscriptionOwner")
+
+  @@index([email])
+  @@index([roleId])
+  @@index([isActive])
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Customers
+// ──────────────────────────────────────────────────────────────────────────────
+
+model Customer {
+  id          String         @id @default(uuid())
+  companyName String
+  email       String         @unique
+  phone       String?
+  address     String?
+  city        String?
+  state       String?
+  country     String?
+  postalCode  String?
+  website     String?
+  tier        CustomerTier   @default(BRONZE)
+  status      CustomerStatus @default(ACTIVE)
+  notes       String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  // ── Relations ──
+  quotations    Quotation[]
+  subscriptions Subscription[]
+  invoices      Invoice[]
+
+  @@index([companyName])
+  @@index([tier])
+  @@index([status])
+  @@index([email])
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Products & Pricing
+// ──────────────────────────────────────────────────────────────────────────────
+
+model Category {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  parentId    String?
+  parent      Category?  @relation("CategoryTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children    Category[] @relation("CategoryTree")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  products Product[]
+
+  @@index([parentId])
+}
+
+model Product {
+  id          String   @id @default(uuid())
+  sku         String   @unique
+  name        String
+  description String?
+  basePrice   Decimal  @db.Decimal(18, 4)
+  costPrice   Decimal  @db.Decimal(18, 4)
+  taxRate     Decimal  @default(0) @db.Decimal(5, 4) // e.g. 0.1800 = 18 %
+  unit        String   @default("unit")              // unit of measure
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // ── Relations ──
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  priceListEntries PriceList[]
+  quotationLines   QuotationLine[]
+  stockLevels      StockLevel[]
+  reservations     Reservation[]
+
+  @@index([sku])
+  @@index([categoryId])
+  @@index([isActive])
+  @@index([name])
+}
+
+/// Tier-specific pricing overrides. A product may have zero or more
+/// price-list entries. If no entry exists for a tier, the product's
+/// basePrice is used.
+model PriceList {
+  id        String       @id @default(uuid())
+  tier      CustomerTier
+  price     Decimal      @db.Decimal(18, 4)
+  currency  String       @default("USD")
+  validFrom DateTime?
+  validTo   DateTime?
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  // A product can only have one price per tier at a time.
+  @@unique([productId, tier])
+  @@index([tier])
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Quotations
+// ──────────────────────────────────────────────────────────────────────────────
+
+model Quotation {
+  id              String          @id @default(uuid())
+  quoteNumber     String          @unique        // human-readable sequential number
+  status          QuotationStatus @default(DRAFT)
+  approvalState   ApprovalStatus  @default(PENDING)
+
+  // ── Financial totals ──
+  subtotal        Decimal         @default(0)  @db.Decimal(18, 4)
+  discountTotal   Decimal         @default(0)  @db.Decimal(18, 4)
+  taxTotal        Decimal         @default(0)  @db.Decimal(18, 4)
+  grandTotal      Decimal         @default(0)  @db.Decimal(18, 4)
+  currency        String          @default("USD")
+
+  // ── Risk & margin analysis ──
+  riskScore       Decimal?        @db.Decimal(5, 2) // 0.00 – 100.00
+  lifetimeMargin  Decimal?        @db.Decimal(18, 4)
+
+  validUntil      DateTime?
+  notes           String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  // ── Relations ──
+  customerId      String
+  customer        Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
+
+  salesRepId      String
+  salesRep        User     @relation("QuotationSalesRep", fields: [salesRepId], references: [id], onDelete: Restrict)
+
+  lines           QuotationLine[]
+  approvals       Approval[]
+  ruleEvaluations RuleEvaluation[]
+  reservations    Reservation[]
+  shipments       Shipment[]
+  invoices        Invoice[]
+  dealHealth      DealHealth?
+  anomalies       Anomaly[]
+
+  @@index([quoteNumber])
+  @@index([customerId])
+  @@index([salesRepId])
+  @@index([status])
+  @@index([approvalState])
+  @@index([createdAt])
+}
+
+model QuotationLine {
+  id          String  @id @default(uuid())
+  quantity    Int
+  unitPrice   Decimal @db.Decimal(18, 4)
+  discount    Decimal @default(0) @db.Decimal(18, 4) // absolute discount amount
+  discountPct Decimal @default(0) @db.Decimal(5, 4)  // discount as decimal fraction
+  taxAmount   Decimal @default(0) @db.Decimal(18, 4)
+  margin      Decimal @default(0) @db.Decimal(18, 4)
+  subtotal    Decimal @default(0) @db.Decimal(18, 4) // (unitPrice * qty) - discount
+  lineNumber  Int     @default(0)                    // display ordering
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // ── Relations ──
+  quotationId String
+  quotation   Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+
+  productId   String
+  product     Product   @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  invoiceLines InvoiceLine[]
+
+  @@index([quotationId])
+  @@index([productId])
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Discount Governance — Decision Trace
+// ──────────────────────────────────────────────────────────────────────────────
+
+/// Organisation-wide discount policies (e.g. "Max 15 % for Gold tier").
+model DiscountPolicy {
+  id          String       @id @default(uuid())
+  name        String       @unique
+  description String?
+  type        DiscountType
+  value       Decimal      @db.Decimal(18, 4) // interpreted per DiscountType
+  minOrderAmt Decimal?     @db.Decimal(18, 4) // optional minimum order amount
+  maxDiscount Decimal?     @db.Decimal(18, 4) // cap on absolute discount
+  tier        CustomerTier? // null = applies to all tiers
+  isActive    Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  approvalRules ApprovalRule[]
+
+  @@index([type])
+  @@index([isActive])
+}
+
+/// Configurable rules that determine when a quotation requires approval
+/// and at what management level.
+model ApprovalRule {
+  id             String   @id @default(uuid())
+  name           String   @unique
+  description    String?
+  /// The approval stage/level this rule triggers (1 = first approver, etc.)
+  stage          Int      @default(1)
+  /// Discount percentage threshold that triggers this rule
+  threshold      Decimal  @db.Decimal(5, 4)
+  /// Role required to approve at this stage
+  approverRole   RoleType
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // ── Relations ──
+  discountPolicyId String?
+  discountPolicy   DiscountPolicy? @relation(fields: [discountPolicyId], references: [id], onDelete: SetNull)
+
+  ruleEvaluations RuleEvaluation[]
+
+  @@index([stage])
+  @@index([isActive])
+}
+
+/// Immutable audit record of every rule evaluated for a quotation.
+/// Powers the "Decision Trace" panel in the UI.
+model RuleEvaluation {
+  id            String      @id @default(uuid())
+  ruleName      String      // snapshot — rule name at evaluation time
+  inputs        Json        // structured input payload (dynamic shape)
+  computedValue Decimal     @db.Decimal(18, 4)
+  threshold     Decimal     @db.Decimal(18, 4)
+  outcome       RuleOutcome
+  explanation   String?     // human-readable reasoning
+  evaluatedAt   DateTime    @default(now())
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  // ── Relations ──
+  quotationId   String
+  quotation     Quotation    @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+
+  ruleId        String?
+  rule          ApprovalRule? @relation(fields: [ruleId], references: [id], onDelete: SetNull)
+
+  @@index([quotationId])
+  @@index([ruleId])
+  @@index([outcome])
+  @@index([evaluatedAt])
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Approval Workflow
+// ──────────────────────────────────────────────────────────────────────────────
+
+/// Each row is a single approval decision. Multi-stage approvals are modeled
+/// by multiple Approval rows for the same quotation with different `stage` values.
+model Approval {
+  id        String         @id @default(uuid())
+  stage     Int            @default(1) // multi-stage: 1, 2, 3 …
+  status    ApprovalStatus @default(PENDING)
+  action    ApprovalAction?
+  comments  String?
+  decidedAt DateTime?
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  // ── Relations ──
+  quotationId String
+  quotation   Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+
+  approverId  String
+  approver    User      @relation("ApprovalApprover", fields: [approverId], references: [id], onDelete: Restrict)
+
+  @@index([quotationId])
+  @@index([approverId])
+  @@index([status])
+  @@index([stage])
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Warehouse & Logistics
+// ──────────────────────────────────────────────────────────────────────────────
+
+model Warehouse {
+  id             String   @id @default(uuid())
+  name           String   @unique
+  code           String   @unique  // short warehouse code (e.g. "WH-US-EAST")
+  location       String
+  address        String?
+  city           String?
+  state          String?
+  country        String?
+  postalCode     String?
+  shippingWeight Decimal? @db.Decimal(10, 2) // default shipment weight in kg
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  stockLevels  StockLevel[]
+  reservations Reservation[]
+  shipments    Shipment[]
+
+  @@index([code])
+  @@index([isActive])
+}
+
+model StockLevel {
   id        String   @id @default(uuid())
-  email     String   @unique
-  name      String?
-  role      UserRole @default(SALES_REP)
+  quantity  Int      @default(0)
+  /// Low-stock threshold; triggers notifications when quantity drops below.
+  reorderAt Int      @default(0)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  warehouseId String
+  warehouse   Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+
+  productId   String
+  product     Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  // One stock record per warehouse-product pair.
+  @@unique([warehouseId, productId])
+  @@index([warehouseId])
+  @@index([productId])
+}
+
+model Reservation {
+  id              String            @id @default(uuid())
+  reservedQty     Int
+  status          ReservationStatus @default(ACTIVE)
+  expiresAt       DateTime?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  quotationId     String
+  quotation       Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+
+  warehouseId     String
+  warehouse       Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
+
+  productId       String
+  product         Product   @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@index([quotationId])
+  @@index([warehouseId])
+  @@index([productId])
+  @@index([status])
+  @@index([expiresAt])
+}
+
+model Shipment {
+  id             String         @id @default(uuid())
+  shipmentNumber String         @unique
+  status         ShipmentStatus @default(PENDING)
+  trackingNumber String?
+  carrier        String?
+  shippedAt      DateTime?
+  deliveredAt    DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  warehouseId    String
+  warehouse      Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
+
+  quotationId    String
+  quotation      Quotation @relation(fields: [quotationId], references: [id], onDelete: Restrict)
+
+  @@index([shipmentNumber])
+  @@index([warehouseId])
+  @@index([quotationId])
+  @@index([status])
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Subscriptions
+// ──────────────────────────────────────────────────────────────────────────────
+
+/// Template plans that customers subscribe to.
+model SubscriptionPlan {
+  id               String          @id @default(uuid())
+  name             String          @unique
+  description      String?
+  billingInterval  BillingInterval
+  price            Decimal         @db.Decimal(18, 4)
+  currency         String          @default("USD")
+  /// Whether partial-period charges are calculated on plan changes.
+  prorationEnabled Boolean         @default(true)
+  /// Number of days notice required before cancellation takes effect.
+  cancellationDays Int             @default(30)
+  trialDays        Int             @default(0)
+  isActive         Boolean         @default(true)
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  subscriptions Subscription[]
+
+  @@index([billingInterval])
+  @@index([isActive])
+}
+
+model Subscription {
+  id              String             @id @default(uuid())
+  status          SubscriptionStatus @default(ACTIVE)
+  startDate       DateTime
+  endDate         DateTime?
+  nextBillingDate DateTime?
+  cancelledAt     DateTime?
+  cancellationReason String?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  // ── Relations ──
+  planId          String
+  plan            SubscriptionPlan @relation(fields: [planId], references: [id], onDelete: Restrict)
+
+  customerId      String
+  customer        Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
+
+  ownerId         String
+  owner           User @relation("SubscriptionOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+
+  recurringInvoices RecurringInvoice[]
+
+  @@index([customerId])
+  @@index([planId])
+  @@index([status])
+  @@index([nextBillingDate])
+}
+
+/// Invoices automatically generated per billing cycle for a subscription.
+model RecurringInvoice {
+  id             String        @id @default(uuid())
+  invoiceNumber  String        @unique
+  amount         Decimal       @db.Decimal(18, 4)
+  currency       String        @default("USD")
+  status         InvoiceStatus @default(DRAFT)
+  periodStart    DateTime
+  periodEnd      DateTime
+  dueDate        DateTime
+  paidAt         DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  subscriptionId String
+  subscription   Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  creditNotes    CreditNote[]
+
+  @@index([subscriptionId])
+  @@index([invoiceNumber])
+  @@index([status])
+  @@index([dueDate])
+}
+
+/// Credit notes issued against recurring invoices (partial refunds, prorations).
+model CreditNote {
+  id               String   @id @default(uuid())
+  creditNoteNumber String   @unique
+  amount           Decimal  @db.Decimal(18, 4)
+  currency         String   @default("USD")
+  reason           String?
+  issuedAt         DateTime @default(now())
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  recurringInvoiceId String
+  recurringInvoice   RecurringInvoice @relation(fields: [recurringInvoiceId], references: [id], onDelete: Cascade)
+
+  @@index([recurringInvoiceId])
+  @@index([creditNoteNumber])
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Billing — Quotation Invoices
+// ──────────────────────────────────────────────────────────────────────────────
+
+model Invoice {
+  id            String        @id @default(uuid())
+  invoiceNumber String        @unique
+  status        InvoiceStatus @default(DRAFT)
+  subtotal      Decimal       @default(0) @db.Decimal(18, 4)
+  taxTotal      Decimal       @default(0) @db.Decimal(18, 4)
+  grandTotal    Decimal       @default(0) @db.Decimal(18, 4)
+  currency      String        @default("USD")
+  issuedAt      DateTime?
+  dueDate       DateTime?
+  paidAt        DateTime?
+  notes         String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  // ── Relations ──
+  customerId    String
+  customer      Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
+
+  quotationId   String
+  quotation     Quotation @relation(fields: [quotationId], references: [id], onDelete: Restrict)
+
+  lines         InvoiceLine[]
+
+  @@index([invoiceNumber])
+  @@index([customerId])
+  @@index([quotationId])
+  @@index([status])
+  @@index([dueDate])
+}
+
+model InvoiceLine {
+  id          String  @id @default(uuid())
+  quantity    Int
+  unitPrice   Decimal @db.Decimal(18, 4)
+  discount    Decimal @default(0) @db.Decimal(18, 4)
+  taxAmount   Decimal @default(0) @db.Decimal(18, 4)
+  subtotal    Decimal @default(0) @db.Decimal(18, 4)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // ── Relations ──
+  invoiceId       String
+  invoice         Invoice       @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  /// References the originating quotation line for traceability.
+  quotationLineId String
+  quotationLine   QuotationLine @relation(fields: [quotationLineId], references: [id], onDelete: Restrict)
+
+  @@index([invoiceId])
+  @@index([quotationLineId])
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Notifications
+// ──────────────────────────────────────────────────────────────────────────────
+
+/// Notification persistence layer. Provider integration (SMS / WhatsApp / Email)
+/// is handled in the service layer — this model only stores delivery state.
+model Notification {
+  id        String             @id @default(uuid())
+  type      NotificationType
+  status    NotificationStatus @default(PENDING)
+  title     String
+  body      String
+  /// Channel-specific metadata (e.g. messageId from provider, template params).
+  metadata  Json?
+  readAt    DateTime?
+  sentAt    DateTime?
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+
+  userId    String
+  user      User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([type])
+  @@index([status])
+  @@index([createdAt])
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Audit
+// ──────────────────────────────────────────────────────────────────────────────
+
+/// Immutable append-only audit log. updatedAt is omitted because audit rows
+/// must never be modified once written.
+model AuditLog {
+  id          String      @id @default(uuid())
+  entity      String      // model / table name
+  entityId    String      // PK of the affected row
+  action      AuditAction
+  prevValue   Json?       // snapshot before change
+  newValue    Json?       // snapshot after change
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime    @default(now())
+
+  // ── Relations ──
+  /// Nullable so we retain the log even if the user is hard-deleted.
+  userId      String?
+  user        User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([entity, entityId])
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Analytics
+// ──────────────────────────────────────────────────────────────────────────────
+
+/// Aggregated health score for a deal/quotation. One-to-one with Quotation.
+model DealHealth {
+  id               String   @id @default(uuid())
+  overallScore     Decimal  @db.Decimal(5, 2) // 0.00 – 100.00
+  marginScore      Decimal? @db.Decimal(5, 2)
+  velocityScore    Decimal? @db.Decimal(5, 2) // deal speed metric
+  engagementScore  Decimal? @db.Decimal(5, 2)
+  lastCalculatedAt DateTime @default(now())
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  quotationId      String   @unique
+  quotation        Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+
+  @@index([overallScore])
+}
+
+/// Individual anomaly signals detected on quotations (e.g. unusual discount,
+/// price outlier, suspicious pattern).
+model Anomaly {
+  id            String          @id @default(uuid())
+  anomalyScore  Decimal         @db.Decimal(5, 2) // 0.00 – 100.00
+  severity      AnomalySeverity @default(LOW)
+  status        AnomalyStatus   @default(OPEN)
+  reason        String          // machine-generated explanation
+  detectedAt    DateTime        @default(now())
+  resolvedAt    DateTime?
+  resolvedBy    String?         // userId of reviewer (soft ref to avoid tight coupling)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  quotationId   String
+  quotation     Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+
+  @@index([quotationId])
+  @@index([severity])
+  @@index([status])
+  @@index([detectedAt])
 }
