@@ -18,20 +18,8 @@ import { createModuleLogger } from "../lib/logger.js";
 
 const log = createModuleLogger("auth-middleware");
 
-export interface AuthenticatedUser {
-  id: string;
-  role: string;
-  email?: string;
-  isInternal?: boolean;
-}
-
-declare global {
-  namespace Express {
-    interface Request {
-      user?: AuthenticatedUser;
-    }
-  }
-}
+import type { AuthenticatedUser } from "../types/auth.js";
+export type { AuthenticatedUser };
 
 export function authenticateInternalOrBearer(
   req: Request,

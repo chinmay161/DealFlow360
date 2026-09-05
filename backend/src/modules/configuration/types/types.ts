@@ -4,9 +4,20 @@
  * Types for Discount Policies, Approval Rules, filters, and pagination.
  */
 
-import type { CustomerTier, RoleType } from "@prisma/client";
+import type { CustomerTier } from "@prisma/client";
 
-export type { CustomerTier, RoleType };
+export type RoleType =
+  | "ADMIN"
+  | "SALES_REP"
+  | "MANAGER"
+  | "FINANCE"
+  | "EXECUTIVE"
+  | "OPERATIONS"
+  | "APPROVER"
+  | "CUSTOMER"
+  | (string & {});
+
+export type { CustomerTier };
 
 export interface DiscountPolicyDomain {
   id: string;

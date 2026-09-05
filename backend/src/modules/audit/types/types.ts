@@ -4,9 +4,35 @@
  * Types for audit events, logging parameters, query filters, and domain models.
  */
 
-import type { AuditAction } from "@prisma/client";
-
-export type { AuditAction };
+export type AuditAction =
+  | "CREATE"
+  | "UPDATE"
+  | "DELETE"
+  | "READ"
+  | "EXECUTE"
+  | "LOGIN"
+  | "LOGOUT"
+  | "FAILED_LOGIN"
+  | "TOKEN_REFRESH"
+  | "QUOTATION_CREATED"
+  | "QUOTATION_UPDATED"
+  | "QUOTATION_SUBMITTED"
+  | "STATE_TRANSITION"
+  | "QUOTATION_CANCELLED"
+  | "EVALUATION_STARTED"
+  | "EVALUATION_COMPLETED"
+  | "WORKFLOW_STARTED"
+  | "APPROVAL_ASSIGNED"
+  | "APPROVED"
+  | "REJECTED"
+  | "RETURNED"
+  | "DISCOUNT_POLICY_CREATED"
+  | "DISCOUNT_POLICY_UPDATED"
+  | "DISCOUNT_POLICY_DELETED"
+  | "APPROVAL_RULE_CREATED"
+  | "APPROVAL_RULE_UPDATED"
+  | "APPROVAL_RULE_DELETED"
+  | (string & {});
 
 /**
  * Standard audit event categories and action names across DealFlow360.

@@ -65,11 +65,20 @@ export class RuleEngine {
 
     // 2 — Get registered rules
     const registry = RuleRegistry.getInstance();
-    const rules = registry.getAll();
+    let rules = registry.getAll();
 
     if (rules.length === 0) {
-      log.warn({ quotationId }, "No rules registered — auto-approving");
-      return this.emptyResult();
+      log.warn({ quotationId }, "RuleRegistry empty — attempting on-demand bootstrapRules()");
+      const { bootstrapRules } = await import("../index.js");
+      bootstrapRules();
+      rules = registry.getAll();
+    }
+
+    if (rules.length === 0) {
+      log.error({ quotationId }, "RuleRegistry failed to bootstrap — refusing silent auto-approval");
+      throw new Error(
+        "Governance Exception: Rule Registry is unpopulated and bootstrap failed. Refusing silent auto-approval."
+      );
     }
 
     // 3 — Execute

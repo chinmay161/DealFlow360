@@ -38,7 +38,7 @@ describe("DiscountPolicyService", () => {
           data: expect.objectContaining({
             entity: "DiscountPolicy",
             action: "CREATE",
-            userId: "user-admin-1",
+            actorId: "user-admin-1",
           }),
         }),
       );

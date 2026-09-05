@@ -5,7 +5,7 @@
  * and audit logging for Approval Rules.
  */
 
-import type { PrismaClient, RoleType } from "@prisma/client";
+import type { PrismaClient } from "@prisma/client";
 import type {
   IApprovalRuleService,
   IValidationService,
@@ -17,6 +17,7 @@ import type {
   ApprovalRuleFilter,
   PaginationParams,
   PaginatedResult,
+  RoleType,
 } from "../types/types.js";
 import { ValidationService } from "./ValidationService.js";
 import { EntityNotFoundError } from "../utils/errors.js";
@@ -273,13 +274,13 @@ export class ApprovalRuleService implements IApprovalRuleService {
       orderBy: [{ stage: "asc" }, { createdAt: "desc" }],
     });
 
-    let domainItems = allRecords.map((r) => this.mapToDomain(r));
+    let domainItems = allRecords.map((r: any) => this.mapToDomain(r));
 
     // In-memory filter for approval level if specified
     if (filter?.level) {
       const levelUpper = filter.level.toUpperCase();
       domainItems = domainItems.filter(
-        (r) =>
+        (r: ApprovalRuleDomain) =>
           r.approvalLevel.toUpperCase() === levelUpper ||
           r.name.toUpperCase().includes(levelUpper),
       );
@@ -374,9 +375,8 @@ export class ApprovalRuleService implements IApprovalRuleService {
           entity: "ApprovalRule",
           entityId,
           action,
-          userId: userId && userId !== "system" ? userId : null,
-          prevValue: prevValue ? prevValue : undefined,
-          newValue: newValue ? newValue : undefined,
+          actorId: userId && userId !== "system" ? userId : null,
+          metadata: { prevValue, newValue },
           createdAt: new Date(),
         },
       });

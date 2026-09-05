@@ -262,13 +262,13 @@ export class DiscountPolicyService implements IDiscountPolicyService {
       this.prisma.discountPolicy.count({ where }),
     ]);
 
-    let domainItems = allRecords.map((r) => this.mapToDomain(r));
+    let domainItems = allRecords.map((r: any) => this.mapToDomain(r));
 
     // In-memory filter for category if specified
     if (filter?.category) {
       const catLower = filter.category.toLowerCase();
       domainItems = domainItems.filter(
-        (p) =>
+        (p: DiscountPolicyDomain) =>
           p.productCategory.toLowerCase() === catLower ||
           p.name.toLowerCase().includes(catLower),
       );
@@ -347,9 +347,8 @@ export class DiscountPolicyService implements IDiscountPolicyService {
           entity: "DiscountPolicy",
           entityId,
           action,
-          userId: userId && userId !== "system" ? userId : null,
-          prevValue: prevValue ? prevValue : undefined,
-          newValue: newValue ? newValue : undefined,
+          actorId: userId && userId !== "system" ? userId : null,
+          metadata: { prevValue, newValue },
           createdAt: new Date(),
         },
       });
