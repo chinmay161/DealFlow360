@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { SerializedQuotationDetail } from "@/lib/quotations";
 import { WorkspaceHeader } from "@/components/WorkspaceHeader";
 import { CustomerSummary } from "@/components/CustomerSummary";
@@ -8,12 +8,16 @@ import { QuoteLineItemsTable } from "@/components/QuoteLineItemsTable";
 import { RecommendationSection } from "@/components/RecommendationSection";
 import { DealIntelligenceRow } from "@/components/DealIntelligenceRow";
 import { QuoteActionBar } from "@/components/QuoteActionBar";
+import { CounterfactualCard } from "@/components/quotations/CounterfactualCard";
+import { DecisionTraceModal } from "@/components/quotations/DecisionTraceModal";
 
 interface QuotationDetailViewProps {
   quotation: SerializedQuotationDetail;
 }
 
 export const QuotationDetailView: React.FC<QuotationDetailViewProps> = ({ quotation }) => {
+  const [isDecisionTraceOpen, setIsDecisionTraceOpen] = useState(false);
+
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-background">
       {/* SCROLLABLE WORKSPACE */}
@@ -55,6 +59,9 @@ export const QuotationDetailView: React.FC<QuotationDetailViewProps> = ({ quotat
 
         <RecommendationSection quotationId={quotation.id} />
 
+        {/* Counterfactual Margin Optimization Engine */}
+        <CounterfactualCard quotationId={quotation.id} />
+
         <DealIntelligenceRow
           currency={quotation.currency}
           subtotal={quotation.subtotal}
@@ -74,7 +81,17 @@ export const QuotationDetailView: React.FC<QuotationDetailViewProps> = ({ quotat
         totalValue={quotation.totalValue}
         currency={quotation.currency}
         status={quotation.status}
+        onOpenDecisionTrace={() => setIsDecisionTraceOpen(true)}
+      />
+
+      {/* DECISION TRACE MODAL */}
+      <DecisionTraceModal
+        quotationId={quotation.id}
+        quotationNumber={quotation.quotationNumber}
+        isOpen={isDecisionTraceOpen}
+        onClose={() => setIsDecisionTraceOpen(false)}
       />
     </div>
   );
 };
+

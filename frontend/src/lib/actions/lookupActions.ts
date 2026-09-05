@@ -41,6 +41,7 @@ export async function getCustomersAction() {
 
   return customers.map((c) => ({
     id: c.id,
+    customerNumber: c.customerNumber,
     name: c.name,
     externalAccountId: c.externalAccountId,
     industry: c.industry,
@@ -49,6 +50,9 @@ export async function getCustomersAction() {
     creditLimit: Number(c.creditLimit),
     creditAvailable: Number(c.creditAvailable),
     territory: c.territory,
+    city: c.city,
+    state: c.state,
+    country: c.country,
     primaryContact: c.contacts.find((cnt) => cnt.isPrimary) || c.contacts[0] || null,
   }));
 }

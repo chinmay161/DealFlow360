@@ -45,3 +45,14 @@ export const SubmitForApprovalSchema = z.object({
 });
 
 export type SubmitForApprovalInput = z.infer<typeof SubmitForApprovalSchema>;
+
+export const CreateQuotationSchema = z.object({
+  customerId: z.string().uuid("Invalid customer ID"),
+  contactId: z.string().uuid("Invalid contact ID").optional().nullable(),
+  currency: z.string().default("INR"),
+  paymentTerms: z.string().optional().default("Net 30 Days"),
+  notes: z.string().max(500).optional().nullable(),
+});
+
+export type CreateQuotationInput = z.infer<typeof CreateQuotationSchema>;
+

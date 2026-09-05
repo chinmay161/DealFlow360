@@ -15,9 +15,10 @@ export async function generateMetadata({
   params,
 }: QuotationDetailPageProps): Promise<Metadata> {
   const { id } = await params;
+  const decodedId = decodeURIComponent(id);
   return {
-    title: `DealFlow360 - Quotation | ${decodeURIComponent(id).toUpperCase()}`,
-    description: `Enterprise Commerce Quotation ${decodeURIComponent(id).toUpperCase()} connected to PostgreSQL`,
+    title: `DealFlow360 - Quotation | ${decodedId.toUpperCase()}`,
+    description: `Enterprise Commerce Quotation ${decodedId.toUpperCase()} connected to PostgreSQL`,
   };
 }
 
@@ -32,7 +33,7 @@ export default async function QuotationDetailPage({ params }: QuotationDetailPag
     quotation = await getQuotationWithLineItems(decodedId);
   } catch (error) {
     console.error(`[QuotationDetailPage] Error loading quotation ${decodedId}:`, error);
-    errorMessage = "Unable to load quotations.";
+    errorMessage = "Unable to load quotation details.";
   }
 
   return (
@@ -42,25 +43,41 @@ export default async function QuotationDetailPage({ params }: QuotationDetailPag
         <TopHeader />
         {!quotation || errorMessage ? (
           <main className="flex-1 flex flex-col items-center justify-center bg-background p-8">
-            <div className="bg-white border border-[#E5E7EB] rounded-lg p-8 max-w-md text-center shadow-sm">
-              <span
-                className="material-symbols-outlined text-4xl text-outline mb-2"
-                data-icon="request_quote"
-              >
-                request_quote
-              </span>
+            <div className="bg-white border border-[#E5E7EB] rounded-lg p-8 max-w-md w-full text-center shadow-sm">
+              <div className="w-12 h-12 mx-auto rounded-full bg-surface-container-high flex items-center justify-center mb-3 text-outline">
+                <span
+                  className="material-symbols-outlined text-2xl"
+                  data-icon="search_off"
+                >
+                  search_off
+                </span>
+              </div>
               <h2 className="text-title-md font-semibold text-on-surface">
-                {errorMessage || "No quotations found."}
+                {errorMessage || "Quotation Not Found"}
               </h2>
-              <p className="text-body-sm text-outline mt-1 mb-4">
-                Quotation #{decodedId} could not be found in PostgreSQL.
+              <p className="text-body-sm text-outline mt-1 mb-6">
+                The requested quotation record <code className="px-1.5 py-0.5 rounded bg-surface-container-high text-on-surface font-code-tabular text-xs">{decodedId}</code> could not be found in PostgreSQL.
               </p>
-              <Link
-                href="/quotations?view=list"
-                className="text-xs text-primary font-semibold hover:underline"
-              >
-                Browse All Quotations Directory →
-              </Link>
+              <div className="flex items-center justify-center gap-3">
+                <Link
+                  href="/quotations"
+                  className="px-4 py-2 rounded-lg bg-primary hover:bg-[#1E3A8A] text-white font-label-md text-xs font-semibold inline-flex items-center gap-1.5 transition-colors shadow-sm"
+                >
+                  <span className="material-symbols-outlined text-sm" data-icon="arrow_back">
+                    arrow_back
+                  </span>
+                  <span>Back to Quotations</span>
+                </Link>
+                <Link
+                  href="/quotations/new"
+                  className="px-4 py-2 rounded-lg border border-[#D1D5DB] bg-white hover:bg-[#F9FAFB] text-on-surface font-label-md text-xs font-semibold inline-flex items-center gap-1.5 transition-colors shadow-sm"
+                >
+                  <span className="material-symbols-outlined text-sm" data-icon="add">
+                    add
+                  </span>
+                  <span>New Quotation</span>
+                </Link>
+              </div>
             </div>
           </main>
         ) : (

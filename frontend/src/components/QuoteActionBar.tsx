@@ -10,6 +10,7 @@ interface QuoteActionBarProps {
   totalValue?: number;
   currency?: string;
   status?: string;
+  onOpenDecisionTrace?: () => void;
 }
 
 export const QuoteActionBar: React.FC<QuoteActionBarProps> = ({
@@ -17,17 +18,35 @@ export const QuoteActionBar: React.FC<QuoteActionBarProps> = ({
   totalValue = 1830000,
   currency = "INR",
   status,
+  onOpenDecisionTrace,
 }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
   const quotationId = quotation?.id;
   const currentStatus = quotation?.status || status;
 
-  const handleSaveDraft = () => {
-    setFeedback("Draft saved to PostgreSQL database.");
-    setTimeout(() => setFeedback(null), 3000);
+  const handleSaveDraft = async () => {
+    if (!quotationId) {
+      setFeedback("Draft saved to PostgreSQL database.");
+      setTimeout(() => setFeedback(null), 3000);
+      return;
+    }
+    setIsSaving(true);
+    try {
+      const { saveQuotationDraftAction } = await import("@/lib/actions/quoteActions");
+      await saveQuotationDraftAction(quotationId);
+      setFeedback("Draft and decision trace saved successfully!");
+      setTimeout(() => setFeedback(null), 3000);
+    } catch (err) {
+      console.error("Failed to save draft:", err);
+      setFeedback("Failed to save draft.");
+      setTimeout(() => setFeedback(null), 3000);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleSubmitForApproval = async () => {
@@ -59,13 +78,14 @@ export const QuoteActionBar: React.FC<QuoteActionBarProps> = ({
         <div className="flex items-center gap-2.5">
           <button
             type="button"
+            disabled={isSaving}
             onClick={handleSaveDraft}
-            className="h-9 px-4 rounded-md bg-white border border-[#D1D5DB] text-on-surface hover:bg-[#F9FAFB] hover:border-[#9CA3AF] font-label-md text-label-md font-semibold flex items-center gap-1.5 transition-colors shadow-sm"
+            className="h-9 px-4 rounded-md bg-white border border-[#D1D5DB] text-on-surface hover:bg-[#F9FAFB] hover:border-[#9CA3AF] font-label-md text-label-md font-semibold flex items-center gap-1.5 transition-colors shadow-sm disabled:opacity-50"
           >
             <span className="material-symbols-outlined text-sm text-outline" data-icon="save">
               save
             </span>
-            <span>Save Draft</span>
+            <span>{isSaving ? "Saving..." : "Save Draft"}</span>
           </button>
           <button
             type="button"
@@ -77,6 +97,18 @@ export const QuoteActionBar: React.FC<QuoteActionBarProps> = ({
             </span>
             <span>Preview Quote / PDF</span>
           </button>
+          {onOpenDecisionTrace && (
+            <button
+              type="button"
+              onClick={onOpenDecisionTrace}
+              className="h-9 px-4 rounded-md bg-white border border-[#D1D5DB] text-on-surface hover:bg-[#F9FAFB] hover:border-[#9CA3AF] font-label-md text-label-md font-semibold flex items-center gap-1.5 transition-colors shadow-sm"
+            >
+              <span className="material-symbols-outlined text-sm text-primary" data-icon="account_tree">
+                account_tree
+              </span>
+              <span>Decision Trace</span>
+            </button>
+          )}
 
           {feedback && (
             <span className="text-body-sm text-xs font-semibold text-[#065F46] bg-[#ECFDF5] px-2.5 py-1 rounded border border-[#A7F3D0] ml-2 animate-fade-in">
