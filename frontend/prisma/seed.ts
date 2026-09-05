@@ -134,6 +134,14 @@ async function main() {
       avatarUrl: null,
       createdAt: new Date("2026-06-05T08:00:00Z"),
     },
+    {
+      id: "d7010da8-887a-482a-a19b-f76be5c2005b",
+      name: "Chinmay Wankhede",
+      email: "2025.chinmay.wankhede@ves.ac.in",
+      role: UserRole.MANAGER,
+      avatarUrl: null,
+      createdAt: new Date("2026-09-05T18:37:14Z"),
+    },
   ];
 
   const seededUsers: Record<string, string> = {};
