@@ -6,8 +6,9 @@ import { usePathname } from "next/navigation";
 
 export const AppSidebar: React.FC = () => {
   const pathname = usePathname();
-  const isDashboard = pathname === "/dashboard" || pathname.startsWith("/dashboard");
-  const isQuotations = !isDashboard && (pathname === "/" || pathname.startsWith("/quotations"));
+  const isApprovals = pathname === "/approvals" || pathname.startsWith("/approvals");
+  const isDashboard = !isApprovals && (pathname === "/dashboard" || pathname.startsWith("/dashboard"));
+  const isQuotations = !isApprovals && !isDashboard && (pathname === "/" || pathname.startsWith("/quotations"));
 
   return (
     <aside className="w-[260px] h-screen bg-surface-container-lowest border-r border-[#E5E7EB] flex flex-col justify-between flex-shrink-0 z-30 select-none">
@@ -89,13 +90,24 @@ export const AppSidebar: React.FC = () => {
           </Link>
 
           {/* Approvals Item */}
-          <a className="flex items-center justify-between px-space-md py-[6px] rounded-lg text-on-surface-variant font-body-md text-body-md hover:bg-surface-container-low transition-colors duration-150" href="#">
+          <Link
+            href="/approvals"
+            className={`flex items-center justify-between px-space-md py-[6px] rounded-lg transition-colors duration-150 ${
+              isApprovals
+                ? "bg-surface-container-low text-primary font-title-md text-body-md font-semibold"
+                : "text-on-surface-variant font-body-md text-body-md hover:bg-surface-container-low"
+            }`}
+          >
             <div className="flex items-center gap-space-sm">
-              <span className="material-symbols-outlined text-outline" data-icon="verified_user">verified_user</span>
+              <span className={`material-symbols-outlined ${isApprovals ? "text-primary" : "text-outline"}`} data-icon="verified_user">
+                verified_user
+              </span>
               <span>Approvals</span>
             </div>
-            <span className="px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-[#FFFBEB] text-[#92400E] border border-[#FDE68A]">2</span>
-          </a>
+            <span className="px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-[#FFFBEB] text-[#92400E] border border-[#FDE68A]">
+              2
+            </span>
+          </Link>
         </div>
 
         {/* Nav Section: Operations */}
