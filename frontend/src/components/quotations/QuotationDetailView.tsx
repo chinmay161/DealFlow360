@@ -1,0 +1,77 @@
+"use client";
+
+import React from "react";
+import { SerializedQuotationDetail } from "@/lib/quotations";
+import { WorkspaceHeader } from "@/components/WorkspaceHeader";
+import { CustomerSummary } from "@/components/CustomerSummary";
+import { QuoteLineItemsTable } from "@/components/QuoteLineItemsTable";
+import { RecommendationSection } from "@/components/RecommendationSection";
+import { DealIntelligenceRow } from "@/components/DealIntelligenceRow";
+import { QuoteActionBar } from "@/components/QuoteActionBar";
+
+interface QuotationDetailViewProps {
+  quotation: SerializedQuotationDetail;
+}
+
+export const QuotationDetailView: React.FC<QuotationDetailViewProps> = ({ quotation }) => {
+  return (
+    <div className="flex-1 flex flex-col overflow-hidden bg-background">
+      {/* SCROLLABLE WORKSPACE */}
+      <div className="flex-1 overflow-y-auto px-space-xl py-space-lg space-y-space-base pb-32">
+        <WorkspaceHeader
+          quotationNumber={quotation.quotationNumber}
+          customerTier={
+            quotation.customer.industry?.includes("Enterprise")
+              ? "Gold Tier"
+              : "Standard Tier"
+          }
+          priceList="Enterprise Price List 2026"
+          revisionText="Revision History (v3)"
+        />
+
+        <CustomerSummary
+          customer={quotation.customer}
+          owner={quotation.owner}
+          buyerContact={
+            quotation.customer.name === "Acme Corporation"
+              ? {
+                  name: "Sarah Jenkins",
+                  title: "VP Procurement",
+                  email: "s.jenkins@acme.com",
+                }
+              : null
+          }
+          paymentTerms="Net 45 Days"
+          creditLine="Credit Line: $250,000.00 Active"
+          territory="Territory: North America West"
+        />
+
+        <QuoteLineItemsTable
+          lineItems={quotation.lineItems}
+          currency={quotation.currency}
+        />
+
+        <RecommendationSection />
+
+        <DealIntelligenceRow
+          currency={quotation.currency}
+          subtotal={quotation.subtotal}
+          discountTotal={quotation.discountTotal}
+          taxTotal={quotation.taxTotal}
+          totalValue={quotation.totalValue}
+          estimatedMargin={quotation.estimatedMargin}
+          riskScore={quotation.riskScore}
+          lineItems={quotation.lineItems}
+          approvals={quotation.approvals}
+        />
+      </div>
+
+      {/* BOTTOM ELEVATED ACTION BAR */}
+      <QuoteActionBar
+        totalValue={quotation.totalValue}
+        currency={quotation.currency}
+        status={quotation.status}
+      />
+    </div>
+  );
+};
