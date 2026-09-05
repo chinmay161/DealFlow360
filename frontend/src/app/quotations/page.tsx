@@ -3,7 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AppSidebar } from "@/components/AppSidebar";
 import { TopHeader } from "@/components/TopHeader";
-import { QuotationsListTable } from "@/components/quotations/QuotationsListTable";
+import { QuotationsViewManager } from "@/components/quotations/QuotationsViewManager";
 import { getQuotations, SerializedQuotationListItem } from "@/lib/quotations";
 import { getCurrentUser } from "@/lib/auth";
 
@@ -74,7 +74,7 @@ export default async function QuotationsPage({ searchParams }: QuotationsPagePro
               </div>
             </div>
 
-            <QuotationsListTable
+            <QuotationsViewManager
               quotations={quotations}
               error={listError}
               initialSearch={initialSearch}
