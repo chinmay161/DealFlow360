@@ -74,6 +74,42 @@ export const WarehouseCardSkeleton: React.FC<{ count?: number }> = ({ count = 3 
   </div>
 );
 
+export const CardSkeleton: React.FC<{ count?: number }> = ({ count = 4 }) => (
+  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+    {Array.from({ length: count }).map((_, i) => (
+      <Card key={i} className="p-4 rounded-xl border border-slate-200/80 bg-white space-y-3">
+        <div className="flex justify-between items-center">
+          <Skeleton className="h-4 w-28" />
+          <Skeleton className="h-7 w-7 rounded-lg" />
+        </div>
+        <Skeleton className="h-8 w-20" />
+        <Skeleton className="h-3 w-36" />
+      </Card>
+    ))}
+  </div>
+);
+
+export const TimelineSkeleton: React.FC<{ steps?: number }> = ({ steps = 6 }) => (
+  <div className="p-4 bg-white rounded-xl border border-slate-200/80 space-y-5">
+    <div className="flex justify-between items-center pb-2 border-b border-slate-100">
+      <Skeleton className="h-4 w-36" />
+      <Skeleton className="h-4 w-20" />
+    </div>
+    <div className="space-y-4 pl-3">
+      {Array.from({ length: steps }).map((_, i) => (
+        <div key={i} className="flex items-start gap-4">
+          <Skeleton className="w-8 h-8 rounded-full flex-shrink-0" />
+          <div className="space-y-1.5 flex-1">
+            <Skeleton className="h-4 w-32" />
+            <Skeleton className="h-3 w-48" />
+            <Skeleton className="h-3 w-24" />
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
 export const ProductDetailSkeleton: React.FC = () => (
   <div className="space-y-4 p-4">
     <div className="flex justify-between items-start">
@@ -91,3 +127,4 @@ export const ProductDetailSkeleton: React.FC = () => (
     <Skeleton className="h-40 w-full rounded-lg" />
   </div>
 );
+
