@@ -17,7 +17,7 @@ import type { PrismaClient } from "@prisma/client";
 import type { RuleEngineResult, Recommendation } from "../interfaces/Rule.js";
 import { ApprovalLevel, Severity } from "../interfaces/Rule.js";
 import type { RuleResult } from "../interfaces/Rule.js";
-import { buildRuleContext } from "./RuleContext.js";
+import { buildRuleContext, type RuleContext } from "./RuleContext.js";
 import { RuleRegistry } from "./RuleRegistry.js";
 import { RuleExecutor } from "./RuleExecutor.js";
 import { RuleEvaluationService } from "../services/RuleEvaluationService.js";
@@ -45,16 +45,23 @@ export class RuleEngine {
   /**
    * Evaluate a quotation against all registered rules.
    *
-   * @param quotationId  UUID of the quotation to evaluate.
+   * @param target  UUID of the quotation or an in-memory RuleContext (for simulations).
+   * @param options Optional configuration (e.g. persistTrace).
    * @returns Aggregate RuleEngineResult with trace, recommendations, and decision.
    */
-  async evaluate(quotationId: string): Promise<RuleEngineResult> {
+  async evaluate(
+    target: string | RuleContext,
+    options?: { persistTrace?: boolean },
+  ): Promise<RuleEngineResult> {
     const overallStart = performance.now();
 
-    log.info({ quotationId }, "Starting rule engine evaluation");
+    const isContext = typeof target !== "string";
+    const quotationId = isContext ? target.quotation.id : target;
 
-    // 1 — Build context
-    const context = await buildRuleContext(this.prisma, quotationId);
+    log.info({ quotationId, isSimulated: isContext }, "Starting rule engine evaluation");
+
+    // 1 — Build context or use provided in-memory context
+    const context = isContext ? target : await buildRuleContext(this.prisma, quotationId);
 
     // 2 — Get registered rules
     const registry = RuleRegistry.getInstance();
@@ -71,12 +78,15 @@ export class RuleEngine {
     // 4 — Aggregate
     const engineResult = this.aggregate(results);
 
-    // 5 — Persist trace
-    try {
-      await this.evaluationService.persist(quotationId, results);
-    } catch (err) {
-      log.error({ quotationId, error: err }, "Failed to persist decision trace");
-      // Non-fatal: we still return the result to the caller
+    // 5 — Persist trace (only if not simulated or explicitly requested)
+    const shouldPersist = options?.persistTrace ?? !isContext;
+    if (shouldPersist) {
+      try {
+        await this.evaluationService.persist(quotationId, results);
+      } catch (err) {
+        log.error({ quotationId, error: err }, "Failed to persist decision trace");
+        // Non-fatal: we still return the result to the caller
+      }
     }
 
     const totalMs = performance.now() - overallStart;
