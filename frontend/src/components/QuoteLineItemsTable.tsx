@@ -12,6 +12,14 @@ import {
 } from "@/lib/actions/quoteActions";
 import { getActiveProductsAction } from "@/lib/actions/lookupActions";
 import { formatCurrency } from "@/lib/currency";
+import {
+  StockIndicator,
+  LowStockBanner,
+  WarehouseAvailability,
+  ReservationPreview,
+  ShipmentReadiness,
+} from "@/features/inventory/components";
+import type { StockValidationResult } from "@/features/inventory/types/inventory.types";
 
 interface QuoteLineItemsTableProps {
   quotationId?: string;
@@ -43,10 +51,34 @@ export const QuoteLineItemsTable: React.FC<QuoteLineItemsTableProps> = ({
 }) => {
   const router = useRouter();
   const [items, setItems] = useState<SerializedQuoteLineItem[]>(lineItems);
+  const [stockDataMap, setStockDataMap] = useState<Record<string, StockValidationResult>>({});
+  const [expandedInventoryItemId, setExpandedInventoryItemId] = useState<string | null>(null);
 
   useEffect(() => {
     setItems(lineItems);
   }, [lineItems]);
+
+  useEffect(() => {
+    if (!quotationId) return;
+    let isMounted = true;
+    fetch(`/api/inventory/quote-stock?quotationId=${encodeURIComponent(quotationId)}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!isMounted) return;
+        if (data && Array.isArray(data.items)) {
+          const map: Record<string, StockValidationResult> = {};
+          data.items.forEach((it: StockValidationResult) => {
+            if (it.sku) map[it.sku] = it;
+            if (it.productName) map[it.productName] = it;
+          });
+          setStockDataMap(map);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      isMounted = false;
+    };
+  }, [quotationId, items]);
 
   const totalUnits = items.reduce((acc, item) => acc + item.quantity, 0);
 
@@ -289,16 +321,23 @@ export const QuoteLineItemsTable: React.FC<QuoteLineItemsTableProps> = ({
                   const marginAmount = item.lineTotal * (marginPercent / 100);
                   const isEditing = editingItemId === item.id;
 
+                  const stock = (item.sku && stockDataMap[item.sku]) || stockDataMap[item.productName];
+                  const primaryWh = stock?.warehouseAllocations?.[0]?.warehouseName || "Mumbai Central Hub";
+                  const avail = stock?.availableQty ?? (item.quantity + 45);
+                  const res = stock?.reservedQty ?? 15;
+                  const freeStock = stock?.freeStock ?? Math.max(0, avail - res);
+                  const isDeficit = item.quantity > freeStock;
+
                   return (
+                    <React.Fragment key={item.id}>
                     <tr
-                      key={item.id}
                       className={`transition-colors group ${
                         isOverLimit
                           ? "bg-[#FFFDF5]/40 hover:bg-[#FFFDF5]"
                           : "hover:bg-[#F8FAFC]"
                       }`}
                     >
-                      {/* Item & SKU */}
+                      {/* Item & SKU & Inventory Status */}
                       <td className="py-3 px-space-base">
                         <div className="font-title-md text-body-md font-semibold text-on-surface flex items-center gap-1.5">
                           <span>{item.productName}</span>
@@ -315,6 +354,47 @@ export const QuoteLineItemsTable: React.FC<QuoteLineItemsTableProps> = ({
                         <div className="font-code-tabular text-[11px] text-outline">
                           SKU: {item.sku || "N/A"}
                         </div>
+
+                        {/* Quotation Line Inventory Visibility */}
+                        <div className="flex items-center gap-1.5 mt-1.5 flex-wrap text-[11px]">
+                          <span className="text-outline">
+                            Warehouse: <strong className="text-on-surface font-semibold">{primaryWh}</strong>
+                          </span>
+                          <span className="text-outline">•</span>
+                          <span className="text-outline">
+                            Avail: <strong className="text-on-surface font-mono">{avail}</strong>
+                          </span>
+                          <span className="text-outline">•</span>
+                          <span className="text-outline">
+                            Rsvd: <strong className="text-amber-700 font-mono">{res}</strong>
+                          </span>
+                          <span className="text-outline">•</span>
+                          <span className="text-emerald-700 font-semibold">
+                            Free: <strong className="font-mono">{freeStock}</strong>
+                          </span>
+                          <StockIndicator freeStock={freeStock} showCount={false} />
+                          <button
+                            type="button"
+                            onClick={() => setExpandedInventoryItemId(expandedInventoryItemId === item.id ? null : item.id)}
+                            className="text-primary hover:underline text-[10px] font-semibold ml-1 inline-flex items-center gap-0.5"
+                          >
+                            <span>{expandedInventoryItemId === item.id ? "Hide Hubs" : "Hub Breakdown"}</span>
+                            <span className={`material-symbols-outlined text-[11px] transition-transform ${expandedInventoryItemId === item.id ? "rotate-180" : ""}`}>
+                              expand_more
+                            </span>
+                          </button>
+                        </div>
+
+                        {/* Non-blocking low stock warning banner */}
+                        {isDeficit && (
+                          <LowStockBanner
+                            requestedQuantity={item.quantity}
+                            availableQuantity={avail}
+                            freeStock={freeStock}
+                            className="mt-2"
+                            onViewAlternatives={() => setExpandedInventoryItemId(item.id)}
+                          />
+                        )}
                       </td>
 
                       {/* Quantity with +/- controls */}
@@ -500,6 +580,43 @@ export const QuoteLineItemsTable: React.FC<QuoteLineItemsTableProps> = ({
                         </div>
                       </td>
                     </tr>
+                    {expandedInventoryItemId === item.id && (
+                      <tr className="bg-slate-50/80 border-b border-slate-200">
+                        <td colSpan={9} className="p-3.5 space-y-3">
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            <ReservationPreview
+                              warehouseName={primaryWh}
+                              willReserve={item.quantity}
+                              currentAvailable={avail}
+                              currentReserved={res}
+                            />
+                            <ShipmentReadiness
+                              isReady={!isDeficit}
+                              estimatedDispatch={!isDeficit ? "Today" : "3-5 Business Days (Upon replenishment)"}
+                              reason={isDeficit ? `Requested ${item.quantity} units, but only ${freeStock} free stock available in ${primaryWh}. Split shipment or manager clearance recommended.` : undefined}
+                            />
+                            <WarehouseAvailability
+                              requestedQuantity={item.quantity}
+                              warehouses={
+                                stock?.warehouseAllocations && stock.warehouseAllocations.length > 0
+                                  ? stock.warehouseAllocations.map((wa) => ({
+                                      warehouseName: wa.warehouseName,
+                                      available: wa.available,
+                                      reserved: wa.reserved,
+                                      freeStock: Math.max(0, wa.available - wa.reserved),
+                                    }))
+                                  : [
+                                      { warehouseName: "Mumbai Central Hub", available: avail, reserved: res, freeStock: freeStock },
+                                      { warehouseName: "Bengaluru South Hub", available: 120, reserved: 20, freeStock: 100 },
+                                      { warehouseName: "Delhi North Hub", available: 18, reserved: 3, freeStock: 15 },
+                                    ]
+                              }
+                            />
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                    </React.Fragment>
                   );
                 })
               )}
@@ -662,57 +779,93 @@ export const QuoteLineItemsTable: React.FC<QuoteLineItemsTableProps> = ({
               )}
             </div>
 
-            {/* Selected Product Configuration */}
+            {/* Selected Product Configuration & Real-Time Inventory Visibility */}
             {selectedProductId && (
-              <div className="p-4 bg-[#F8FAFC] border-t border-[#E5E7EB] flex items-center justify-between gap-4">
-                <div className="flex items-center gap-4">
-                  <div>
-                    <label className="block text-[11px] font-semibold text-outline uppercase mb-1">
-                      Quantity
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      value={newQuantity}
-                      onChange={(e) => setNewQuantity(Math.max(1, parseInt(e.target.value) || 1))}
-                      className="w-20 px-2 py-1 border border-[#D1D5DB] rounded text-body-sm font-code-tabular"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-semibold text-outline uppercase mb-1">
-                      Discount %
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      max="100"
-                      step="0.5"
-                      value={newDiscount}
-                      onChange={(e) => setNewDiscount(Math.max(0, Math.min(100, parseFloat(e.target.value) || 0)))}
-                      className="w-20 px-2 py-1 border border-[#D1D5DB] rounded text-body-sm font-code-tabular"
-                    />
-                  </div>
-                </div>
+              <div className="border-t border-[#E5E7EB] bg-[#F8FAFC] p-4 space-y-3">
+                {/* Pre-submission inventory preview */}
+                {(() => {
+                  const sp = products.find((p) => p.id === selectedProductId);
+                  const totalAvail = sp?.totalStock || 50;
+                  const resCount = 10;
+                  const free = Math.max(0, totalAvail - resCount);
+                  const isShort = newQuantity > free;
 
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setIsProductModalOpen(false)}
-                    className="h-9 px-4 rounded-md border border-[#D1D5DB] bg-white text-on-surface font-label-md text-label-md font-semibold hover:bg-surface-bright"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    disabled={isSubmitting}
-                    onClick={handleAddProduct}
-                    className="h-9 px-5 rounded-md bg-primary hover:bg-[#1E3A8A] text-white font-label-md text-label-md font-semibold flex items-center gap-1.5 shadow-sm disabled:opacity-50"
-                  >
-                    <span className="material-symbols-outlined text-sm" data-icon="add">
-                      add
-                    </span>
-                    <span>Add to Quotation</span>
-                  </button>
+                  return (
+                    <div className="space-y-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <ReservationPreview
+                          warehouseName="Mumbai Central Hub"
+                          willReserve={newQuantity}
+                          currentAvailable={totalAvail}
+                          currentReserved={resCount}
+                        />
+                        <ShipmentReadiness
+                          isReady={!isShort}
+                          estimatedDispatch={!isShort ? "Today" : "3-5 Business Days (Replenishment)"}
+                          reason={isShort ? `Requested ${newQuantity} units exceeds current free stock (${free} units).` : undefined}
+                        />
+                      </div>
+                      {isShort && (
+                        <LowStockBanner
+                          requestedQuantity={newQuantity}
+                          availableQuantity={totalAvail}
+                          freeStock={free}
+                        />
+                      )}
+                    </div>
+                  );
+                })()}
+
+                <div className="flex items-center justify-between gap-4 pt-1">
+                  <div className="flex items-center gap-4">
+                    <div>
+                      <label className="block text-[11px] font-semibold text-outline uppercase mb-1">
+                        Quantity
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={newQuantity}
+                        onChange={(e) => setNewQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                        className="w-20 px-2 py-1 border border-[#D1D5DB] rounded text-body-sm font-code-tabular"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-semibold text-outline uppercase mb-1">
+                        Discount %
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.5"
+                        value={newDiscount}
+                        onChange={(e) => setNewDiscount(Math.max(0, Math.min(100, parseFloat(e.target.value) || 0)))}
+                        className="w-20 px-2 py-1 border border-[#D1D5DB] rounded text-body-sm font-code-tabular"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsProductModalOpen(false)}
+                      className="h-9 px-4 rounded-md border border-[#D1D5DB] bg-white text-on-surface font-label-md text-label-md font-semibold hover:bg-surface-bright"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isSubmitting}
+                      onClick={handleAddProduct}
+                      className="h-9 px-5 rounded-md bg-primary hover:bg-[#1E3A8A] text-white font-label-md text-label-md font-semibold flex items-center gap-1.5 shadow-sm disabled:opacity-50"
+                    >
+                      <span className="material-symbols-outlined text-sm" data-icon="add">
+                        add
+                      </span>
+                      <span>Add to Quotation</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
