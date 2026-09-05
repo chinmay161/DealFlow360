@@ -54,7 +54,7 @@ export default async function DashboardPage() {
               {/* LEFT COLUMN: ACTIVE DEALS & PIPELINE PERFORMANCE */}
               <div className="col-span-8 space-y-space-base">
                 <ActiveDealsTable deals={metrics?.activeDeals} />
-                <PipelinePerformance />
+                <PipelinePerformance initialStages={metrics?.pipelineStages} />
               </div>
 
               {/* RIGHT COLUMN: ACTION REQUIRED & DEAL HEALTH */}

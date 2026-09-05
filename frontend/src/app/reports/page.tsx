@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { AppSidebar } from "@/components/AppSidebar";
 import { TopHeader } from "@/components/TopHeader";
 import { ReportsDashboard } from "@/components/reports/ReportsDashboard";
+import { getCommercialReportData } from "@/lib/services/reportService";
 
 export const metadata: Metadata = {
   title: "DealFlow360 - Commercial Reports & Analytics",
@@ -10,7 +11,9 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
-export default function ReportsRoute() {
+export default async function ReportsRoute() {
+  const reportData = await getCommercialReportData();
+
   return (
     <>
       <AppSidebar />
@@ -18,7 +21,7 @@ export default function ReportsRoute() {
         <TopHeader />
         <main className="flex-1 flex flex-col overflow-hidden bg-background">
           <div className="flex-1 overflow-y-auto px-space-xl py-space-lg space-y-space-base pb-32">
-            <ReportsDashboard />
+            <ReportsDashboard initialData={reportData} />
           </div>
         </main>
       </div>

@@ -1,24 +1,29 @@
 "use client";
 
 import React, { useState } from "react";
+import { CommercialReportData } from "@/lib/services/reportService";
 
-export const ReportsDashboard: React.FC = () => {
+interface ReportsDashboardProps {
+  initialData?: CommercialReportData;
+}
+
+export const ReportsDashboard: React.FC<ReportsDashboardProps> = ({ initialData }) => {
   const [dateRange, setDateRange] = useState("FY 2026-27 (Q2)");
 
-  const kpis = [
+  const kpis = initialData?.kpis || [
     { label: "REALIZED GROSS MARGIN", value: "34.8%", sub: "+2.4% vs target (32.4%)", positive: true, icon: "trending_up" },
     { label: "CONTRACTED REVENUE (ARR + TCV)", value: "₹9,96,20,000", sub: "13 Active Indian Enterprise Deals", positive: true, icon: "account_balance" },
     { label: "DISCOUNT LEAKAGE GOVERNANCE", value: "3.2%", sub: "-1.8% variance under threshold", positive: true, icon: "verified" },
     { label: "AVG FULFILLMENT CYCLE", value: "3.8 Days", sub: "Multi-warehouse split BlueDart SLA", positive: true, icon: "local_shipping" },
   ];
 
-  const categoryMargins = [
+  const categoryMargins = initialData?.categoryMargins || [
     { category: "Hardware & Infrastructure", revenue: "₹3,42,00,000", cost: "₹2,32,56,000", marginPct: "32.0%", target: "30.0%", status: "On Target" },
     { category: "Cloud SaaS Subscriptions", revenue: "₹5,14,20,000", cost: "₹82,27,200", marginPct: "84.0%", target: "80.0%", status: "Exceeding" },
     { category: "Migration & Professional Services", revenue: "₹1,40,00,000", cost: "₹72,80,000", marginPct: "48.0%", target: "45.0%", status: "Exceeding" },
   ];
 
-  const tierPerformance = [
+  const tierPerformance = initialData?.tierPerformance || [
     { tier: "Gold Preferred (Enterprise)", accounts: 3, totalDeals: 7, volume: "₹5,42,00,000", avgDiscount: "14.2%", realizedMargin: "36.4%" },
     { tier: "Silver Commercial", accounts: 1, totalDeals: 4, volume: "₹2,84,00,000", avgDiscount: "9.8%", realizedMargin: "33.2%" },
     { tier: "Bronze Emerging", accounts: 1, totalDeals: 2, volume: "₹1,70,20,000", avgDiscount: "5.5%", realizedMargin: "38.1%" },
@@ -67,7 +72,7 @@ export const ReportsDashboard: React.FC = () => {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {kpis.map((kpi, idx) => (
           <div
             key={idx}
@@ -101,28 +106,36 @@ export const ReportsDashboard: React.FC = () => {
           </span>
         </div>
 
-        <table className="w-full text-left text-xs">
-          <thead className="bg-slate-50 border-b border-[#E5E7EB] text-outline font-semibold uppercase text-[10px]">
-            <tr>
-              <th className="py-3 px-6">Product &amp; Service Category</th>
-              <th className="py-3 px-4 text-right">Recognized Revenue</th>
-              <th className="py-3 px-4 text-right">Delivered COGS</th>
-              <th className="py-3 px-4 text-right">Gross Margin %</th>
-              <th className="py-3 px-4 text-right">Target Floor</th>
-              <th className="py-3 px-6 text-center">Status</th>
+        <table className="w-full text-left text-xs border-collapse">
+          <thead>
+            <tr className="border-b border-[#E5E7EB] bg-slate-50/80 text-outline uppercase font-semibold text-[10px] tracking-wider">
+              <th className="px-6 py-3">Category Name</th>
+              <th className="px-6 py-3">Contracted Revenue</th>
+              <th className="px-6 py-3">Cost of Delivery</th>
+              <th className="px-6 py-3">Realized Margin</th>
+              <th className="px-6 py-3">Target Margin</th>
+              <th className="px-6 py-3 text-right">Policy Status</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-[#F1F5F9]">
-            {categoryMargins.map((cm, idx) => (
-              <tr key={idx} className="hover:bg-slate-50/60">
-                <td className="py-3.5 px-6 font-semibold text-on-surface">{cm.category}</td>
-                <td className="py-3.5 px-4 text-right font-code-tabular tnum font-medium text-on-surface">{cm.revenue}</td>
-                <td className="py-3.5 px-4 text-right font-code-tabular tnum text-outline">{cm.cost}</td>
-                <td className="py-3.5 px-4 text-right font-code-tabular tnum font-bold text-emerald-700">{cm.marginPct}</td>
-                <td className="py-3.5 px-4 text-right font-code-tabular tnum text-outline">{cm.target}</td>
-                <td className="py-3.5 px-6 text-center">
-                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
-                    {cm.status}
+          <tbody className="divide-y divide-[#F3F4F6]">
+            {categoryMargins.map((cat, idx) => (
+              <tr key={idx} className="hover:bg-slate-50/60 transition-colors">
+                <td className="px-6 py-3.5 font-bold text-on-surface">{cat.category}</td>
+                <td className="px-6 py-3.5 font-code-tabular tnum text-on-surface">{cat.revenue}</td>
+                <td className="px-6 py-3.5 font-code-tabular tnum text-outline">{cat.cost}</td>
+                <td className="px-6 py-3.5 font-code-tabular tnum font-bold text-emerald-600">{cat.marginPct}</td>
+                <td className="px-6 py-3.5 font-code-tabular tnum text-outline">{cat.target}</td>
+                <td className="px-6 py-3.5 text-right">
+                  <span
+                    className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${
+                      cat.status === "Exceeding"
+                        ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                        : cat.status === "On Target"
+                        ? "bg-blue-50 text-blue-700 border border-blue-200"
+                        : "bg-amber-50 text-amber-700 border border-amber-200"
+                    }`}
+                  >
+                    {cat.status}
                   </span>
                 </td>
               </tr>
@@ -131,37 +144,42 @@ export const ReportsDashboard: React.FC = () => {
         </table>
       </div>
 
-      {/* Customer Account Tier Profitability */}
+      {/* Customer Tier Commercial Performance */}
       <div className="bg-white border border-[#E5E7EB] rounded-xl shadow-xs overflow-hidden">
         <div className="px-6 py-4 border-b border-[#E5E7EB] flex items-center justify-between bg-slate-50/50">
           <div>
             <h3 className="font-title-md text-sm font-bold text-on-surface">
-              Customer Account Tier Profitability &amp; Concessions
+              Commercial Tier Performance &amp; Discounting
             </h3>
             <p className="text-body-sm text-xs text-outline">
-              Audited performance across Indian enterprise accounts.
+              Analysis of volume capture versus average discount leakage by customer tier.
             </p>
           </div>
         </div>
 
-        <table className="w-full text-left text-xs">
-          <thead className="bg-slate-50 border-b border-[#E5E7EB] text-outline font-semibold uppercase text-[10px]">
-            <tr>
-              <th className="py-3 px-6">Account Tier</th>
-              <th className="py-3 px-4 text-right">Active Accounts</th>
-              <th className="py-3 px-4 text-right">Total Deal Volume</th>
-              <th className="py-3 px-4 text-right">Avg. Granted Discount</th>
-              <th className="py-3 px-6 text-right">Realized Gross Margin</th>
+        <table className="w-full text-left text-xs border-collapse">
+          <thead>
+            <tr className="border-b border-[#E5E7EB] bg-slate-50/80 text-outline uppercase font-semibold text-[10px] tracking-wider">
+              <th className="px-6 py-3">Customer Tier</th>
+              <th className="px-6 py-3">Active Accounts</th>
+              <th className="px-6 py-3">Quoted Deals</th>
+              <th className="px-6 py-3">Total Volume</th>
+              <th className="px-6 py-3">Avg Discount Given</th>
+              <th className="px-6 py-3 text-right">Realized Gross Margin</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-[#F1F5F9]">
-            {tierPerformance.map((tp, idx) => (
-              <tr key={idx} className="hover:bg-slate-50/60">
-                <td className="py-3.5 px-6 font-semibold text-on-surface">{tp.tier}</td>
-                <td className="py-3.5 px-4 text-right font-code-tabular tnum">{tp.accounts} enterprise accounts</td>
-                <td className="py-3.5 px-4 text-right font-code-tabular tnum font-bold text-on-surface">{tp.volume}</td>
-                <td className="py-3.5 px-4 text-right font-code-tabular tnum text-amber-700 font-semibold">{tp.avgDiscount}</td>
-                <td className="py-3.5 px-6 text-right font-code-tabular tnum font-bold text-emerald-700">{tp.realizedMargin}</td>
+          <tbody className="divide-y divide-[#F3F4F6]">
+            {tierPerformance.map((row, idx) => (
+              <tr key={idx} className="hover:bg-slate-50/60 transition-colors">
+                <td className="px-6 py-3.5 font-bold text-on-surface flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-primary"></span>
+                  <span>{row.tier}</span>
+                </td>
+                <td className="px-6 py-3.5 font-code-tabular tnum text-on-surface">{row.accounts}</td>
+                <td className="px-6 py-3.5 font-code-tabular tnum text-on-surface">{row.totalDeals}</td>
+                <td className="px-6 py-3.5 font-code-tabular tnum font-bold text-on-surface">{row.volume}</td>
+                <td className="px-6 py-3.5 font-code-tabular tnum text-amber-700 font-semibold">{row.avgDiscount}</td>
+                <td className="px-6 py-3.5 font-code-tabular tnum font-bold text-emerald-700 text-right">{row.realizedMargin}</td>
               </tr>
             ))}
           </tbody>

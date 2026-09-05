@@ -14,33 +14,8 @@ interface RecentActivityFeedProps {
   }>;
 }
 
-export const RecentActivityFeed: React.FC<RecentActivityFeedProps> = ({ activities }) => {
-  const displayActivities = activities && activities.length > 0 ? activities : [
-    {
-      id: "act-1",
-      actorName: "Arjun Mehta",
-      dealId: "Q-1042",
-      action: "Submitted for approval",
-      notes: "Stage 1 approval chain initiated",
-      timestamp: new Date().toISOString(),
-    },
-    {
-      id: "act-2",
-      actorName: "Vikram Desai",
-      dealId: "Q-1041",
-      action: "Stage Approved",
-      notes: "Sales Management approved discount terms",
-      timestamp: new Date().toISOString(),
-    },
-    {
-      id: "act-3",
-      actorName: "Meera Joshi",
-      dealId: "Q-1038",
-      action: "Changes Requested",
-      notes: "Margin adjustment requested",
-      timestamp: new Date().toISOString(),
-    },
-  ];
+export const RecentActivityFeed: React.FC<RecentActivityFeedProps> = ({ activities = [] }) => {
+  const displayActivities = activities || [];
 
   return (
     <div className="bg-white border border-[#E5E7EB] rounded-lg p-space-base shadow-[0px_1px_2px_rgba(15,23,42,0.04)]">
@@ -58,10 +33,10 @@ export const RecentActivityFeed: React.FC<RecentActivityFeedProps> = ({ activiti
           </span>
         </div>
         <Link
-          href="/approvals"
+          href="/audit"
           className="font-label-sm text-label-sm text-primary hover:underline flex items-center gap-0.5"
         >
-          <span>View All Approvals</span>
+          <span>View All Audit Logs</span>
           <span className="material-symbols-outlined text-xs" data-icon="arrow_forward">
             arrow_forward
           </span>
@@ -70,7 +45,18 @@ export const RecentActivityFeed: React.FC<RecentActivityFeedProps> = ({ activiti
 
       {/* Activity Items */}
       <div className="divide-y divide-[#F1F5F9]">
-        {displayActivities.slice(0, 5).map((item) => (
+        {displayActivities.length === 0 ? (
+          <div className="py-8 text-center text-outline">
+            <span className="material-symbols-outlined text-3xl text-outline/50 mb-1" data-icon="history_edu">
+              history_edu
+            </span>
+            <p className="text-body-sm font-medium text-on-surface">No Recent Activity Recorded</p>
+            <p className="text-[11px] text-outline mt-0.5">
+              Commercial approvals and status transitions will log here in real-time.
+            </p>
+          </div>
+        ) : (
+          displayActivities.slice(0, 5).map((item) => (
           <div key={item.id} className="py-2.5 flex items-center justify-between gap-3 text-body-sm">
             <div className="flex items-center gap-3">
               <div className="w-7 h-7 rounded-full bg-[#EFF6FF] border border-[#BFDBFE] text-primary flex items-center justify-center flex-shrink-0">
@@ -93,7 +79,8 @@ export const RecentActivityFeed: React.FC<RecentActivityFeedProps> = ({ activiti
               {new Date(item.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
             </span>
           </div>
-        ))}
+          ))
+        )}
       </div>
     </div>
   );
