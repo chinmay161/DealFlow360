@@ -3,6 +3,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 import { createDecisionTraceRouter } from "./modules/decision-trace/index.js";
 import { createApprovalRouter } from "./modules/approval-routing/index.js";
+import { createCounterfactualRouter } from "./modules/counterfactual/index.js";
 
 dotenv.config();
 
@@ -23,6 +24,7 @@ app.get("/health", (_req: Request, res: Response) => {
 // ── Module routers ───────────────────────────────────────────────────────────
 app.use(createDecisionTraceRouter());
 app.use(createApprovalRouter());
+app.use(createCounterfactualRouter());
 
 app.listen(PORT, () => {
   console.log(`[DealFlow360 Backend] Server running on http://localhost:${PORT}`);
