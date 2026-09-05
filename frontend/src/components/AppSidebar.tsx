@@ -47,7 +47,7 @@ export const AppSidebar: React.FC = () => {
       .join("") || "CU";
   const avatarUrl = session?.user?.image;
 
-  const isOverview = pathname === "/overview" || pathname.startsWith("/overview");
+  const isOverview = pathname === "/overview" || pathname.startsWith("/overview") || pathname === "/";
   const isApprovals = pathname === "/approvals" || pathname.startsWith("/approvals");
   const isDashboard = !isApprovals && !isOverview && (pathname === "/dashboard" || pathname.startsWith("/dashboard"));
   const isFulfillment = pathname === "/fulfillment" || pathname.startsWith("/fulfillment/");
@@ -56,13 +56,16 @@ export const AppSidebar: React.FC = () => {
   const isReports = pathname === "/reports" || pathname.startsWith("/reports/");
   const isPortal = pathname === "/portal" || pathname.startsWith("/portal/");
 
-  const isQuotations = !isApprovals && !isDashboard && !isOverview && !isFulfillment && !isSubscriptions && !isInvoices && (pathname === "/" || pathname.startsWith("/quotations"));
+  const isQuotations = !isApprovals && !isDashboard && !isOverview && !isFulfillment && !isSubscriptions && !isInvoices && pathname.startsWith("/quotations");
 
   return (
     <aside className="w-[260px] h-screen bg-surface-container-lowest border-r border-[#E5E7EB] flex flex-col justify-between flex-shrink-0 z-30 select-none">
       <div className="flex flex-col h-full overflow-y-auto">
         {/* Brand Crest & Platform Name */}
-        <div className="h-14 px-space-base flex items-center gap-space-sm border-b border-[#E5E7EB]">
+        <Link
+          href="/overview"
+          className="h-14 px-space-base flex items-center gap-space-sm border-b border-[#E5E7EB] hover:bg-surface-container-low transition-colors"
+        >
           <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-on-primary font-bold text-headline-sm shadow-sm">
             <span className="material-symbols-outlined text-white" data-icon="token">token</span>
           </div>
@@ -70,7 +73,7 @@ export const AppSidebar: React.FC = () => {
             <span className="font-headline-sm text-title-md text-primary font-bold tracking-tight">DealFlow360</span>
             <span className="font-label-sm text-label-sm text-outline tracking-normal">Enterprise Commerce</span>
           </div>
-        </div>
+        </Link>
 
         {/* Quick CTA Button */}
         <div className="p-space-base pb-space-xs">

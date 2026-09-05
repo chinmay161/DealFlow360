@@ -52,11 +52,11 @@ export const authConfig: NextAuthConfig = {
       if (url.startsWith("/")) {
         // Prevent open redirect attack (e.g. //attacker.com)
         if (url.startsWith("//")) {
-          return `${baseUrl}/dashboard`;
+          return `${baseUrl}/overview`;
         }
         // Never redirect back to login upon successful authentication
         if (url === "/login" || url.startsWith("/login?")) {
-          return `${baseUrl}/dashboard`;
+          return `${baseUrl}/overview`;
         }
         return `${baseUrl}${url}`;
       }
@@ -66,16 +66,16 @@ export const authConfig: NextAuthConfig = {
         const parsedUrl = new URL(url);
         if (parsedUrl.origin === baseUrl) {
           if (parsedUrl.pathname === "/login") {
-            return `${baseUrl}/dashboard`;
+            return `${baseUrl}/overview`;
           }
           return url;
         }
       } catch {
-        return `${baseUrl}/dashboard`;
+        return `${baseUrl}/overview`;
       }
 
       // Default safe landing destination
-      return `${baseUrl}/dashboard`;
+      return `${baseUrl}/overview`;
     },
     authorized({ auth, request: { nextUrl } }) {
       const isLoggedIn = !!auth?.user;
@@ -94,12 +94,12 @@ export const authConfig: NextAuthConfig = {
       const isLoginPage = pathname === "/login";
       if (isLoginPage) {
         if (isLoggedIn) {
-          return Response.redirect(new URL("/dashboard", nextUrl));
+          return Response.redirect(new URL("/overview", nextUrl));
         }
         return true;
       }
 
-      // Protected routes: Quotations (/ and /quotations), Dashboard (/dashboard), Approvals (/approvals), etc.
+      // Protected routes: Overview (/ and /overview), Dashboard (/dashboard), Quotations (/quotations), etc.
       return isLoggedIn;
     },
   },
