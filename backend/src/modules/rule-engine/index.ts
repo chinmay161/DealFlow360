@@ -26,8 +26,8 @@ export { Severity, ApprovalLevel } from "./interfaces/Rule.js";
 
 // ── Services ─────────────────────────────────────────────────────────────────
 export { RuleEvaluationService } from "./services/RuleEvaluationService.js";
-export { DecisionTraceService } from "./services/DecisionTraceService.js";
-export type { DecisionTrace, DecisionTraceEntry } from "./services/DecisionTraceService.js";
+// NOTE: DecisionTraceService has been moved to src/modules/decision-trace/
+// which provides a richer implementation with formatting, filtering, export, etc.
 
 // ── Rules ────────────────────────────────────────────────────────────────────
 import { DiscountCeilingRule } from "./rules/DiscountCeilingRule.js";

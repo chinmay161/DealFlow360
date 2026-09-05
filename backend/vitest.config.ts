@@ -7,8 +7,14 @@ export default defineConfig({
     include: ["src/**/__tests__/**/*.test.ts"],
     coverage: {
       provider: "v8",
-      include: ["src/modules/rule-engine/**"],
-      exclude: ["src/modules/rule-engine/__tests__/**"],
+      include: [
+        "src/modules/rule-engine/**",
+        "src/modules/decision-trace/**",
+      ],
+      exclude: [
+        "src/modules/rule-engine/__tests__/**",
+        "src/modules/decision-trace/__tests__/**",
+      ],
     },
   },
 });
