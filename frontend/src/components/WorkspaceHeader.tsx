@@ -20,13 +20,13 @@ export const WorkspaceHeader: React.FC<WorkspaceHeaderProps> = ({
     <>
       {/* Breadcrumb & Deal Hierarchy */}
       <div className="flex items-center gap-1.5 text-label-sm font-label-sm text-outline">
-        <Link className="hover:text-primary transition-colors" href="/quotations?view=list">
+        <Link className="hover:text-primary transition-colors" href="/quotations">
           Quotations
         </Link>
         <span className="material-symbols-outlined text-xs" data-icon="chevron_right">
           chevron_right
         </span>
-        <span className="text-on-surface-variant font-code-tabular">{quotationNumber}</span>
+        <span className="text-on-surface-variant font-code-tabular font-medium">{quotationNumber}</span>
         <span className="material-symbols-outlined text-xs" data-icon="chevron_right">
           chevron_right
         </span>
