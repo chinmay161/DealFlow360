@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { Bookmark, Truck } from "lucide-react";
 import { SerializedQuotationDetail } from "@/lib/quotations";
 import { WorkspaceHeader } from "@/components/WorkspaceHeader";
 import { CustomerSummary } from "@/components/CustomerSummary";
@@ -17,8 +18,7 @@ import {
   QuotationInventoryWidget,
   RuleEngineInventoryStatusWidget,
   FulfillmentTimeline,
-  ReservationStatusCard,
-  ShipmentStatusCard,
+  ShipmentTimeline,
   WarehouseComparison,
 } from "@/features/inventory/components";
 
@@ -109,27 +109,147 @@ export const QuotationDetailView: React.FC<QuotationDetailViewProps> = ({ quotat
 
           {/* Operational Reservation & Consignment Tracking Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-space-base">
-            <ReservationStatusCard
-              data={{
-                quotationNumber: quotation.quotationNumber,
-                warehouseName: "Mumbai Central Hub (WH-BOM)",
-                status: quotation.status === "APPROVED" || quotation.status === "ACCEPTED" ? "RESERVED" : "PENDING",
-                reservedQuantity: quotation.lineItems.reduce((sum, li) => sum + li.quantity, 0),
-                reservedAt: "Upon quotation approval",
-                expiresAt: "7 days from reservation",
-              }}
-            />
-            <ShipmentStatusCard
-              data={{
-                shipmentNumber: `SHP-${quotation.quotationNumber.replace("Q-", "") || "1048"}`,
-                carrier: "BlueDart Enterprise Express",
-                trackingNumber: `BD-${quotation.id.slice(0, 8).toUpperCase()}`,
-                status: quotation.status === "ACCEPTED" ? "SHIPPED" : "PACKED",
-                estimatedDelivery: "Tomorrow by 2:00 PM",
-                originWarehouse: "Mumbai Central Hub",
-              }}
-            />
+            {/* Dedicated Reservation Card */}
+            <div className="p-4 rounded-xl border border-slate-200/80 bg-white shadow-xs space-y-3">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+                    <Bookmark className="w-4 h-4" />
+                  </div>
+                  <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                    Reservation
+                  </h4>
+                </div>
+                <span
+                  className={`px-2.5 py-0.5 rounded-full text-xs font-semibold border ${
+                    quotation.status === "APPROVED" || quotation.status === "ACCEPTED" || quotation.status === "SENT"
+                      ? "bg-blue-50 text-blue-700 border-blue-200"
+                      : "bg-amber-50 text-amber-700 border-amber-200"
+                  }`}
+                >
+                  {quotation.status === "APPROVED" || quotation.status === "ACCEPTED" || quotation.status === "SENT"
+                    ? "Reserved"
+                    : "Pending"}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3 text-xs">
+                <div>
+                  <span className="text-[10px] uppercase font-semibold text-slate-400 block">
+                    Warehouse
+                  </span>
+                  <span className="font-semibold text-slate-800 text-sm">Mumbai</span>
+                  <span className="font-mono text-[10px] text-slate-400 block">WH-BOM</span>
+                </div>
+
+                <div>
+                  <span className="text-[10px] uppercase font-semibold text-slate-400 block">
+                    Reserved
+                  </span>
+                  <span className="font-mono font-bold text-sm text-blue-700">
+                    {quotation.lineItems.reduce((sum, li) => sum + li.quantity, 0) || 25} Units
+                  </span>
+                  <span className="text-[10px] text-slate-400 block">Committed Stock</span>
+                </div>
+
+                <div>
+                  <span className="text-[10px] uppercase font-semibold text-slate-400 block">
+                    Status
+                  </span>
+                  <span className="font-semibold text-emerald-700 text-sm">
+                    {quotation.status === "APPROVED" || quotation.status === "ACCEPTED" || quotation.status === "SENT"
+                      ? "Reserved"
+                      : "Pending Approval"}
+                  </span>
+                  <span className="text-[10px] text-slate-400 block">
+                    {quotation.status === "APPROVED" || quotation.status === "ACCEPTED" || quotation.status === "SENT"
+                      ? "Active Allocation"
+                      : "Review Required"}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Dedicated Shipment Card */}
+            <div className="p-4 rounded-xl border border-slate-200/80 bg-white shadow-xs space-y-3">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+                    <Truck className="w-4 h-4" />
+                  </div>
+                  <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                    Shipment
+                  </h4>
+                </div>
+                <span
+                  className={`px-2.5 py-0.5 rounded-full text-xs font-semibold border ${
+                    quotation.status === "APPROVED" || quotation.status === "ACCEPTED" || quotation.status === "SENT"
+                      ? "bg-purple-50 text-purple-700 border-purple-200"
+                      : "bg-slate-100 text-slate-600 border-slate-200"
+                  }`}
+                >
+                  {quotation.status === "APPROVED" || quotation.status === "ACCEPTED" || quotation.status === "SENT"
+                    ? "Packed"
+                    : "Pending Approval"}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3 text-xs">
+                <div>
+                  <span className="text-[10px] uppercase font-semibold text-slate-400 block">
+                    Shipment
+                  </span>
+                  <span className="font-mono font-bold text-sm text-slate-900">
+                    SHP-{quotation.quotationNumber.replace(/[^0-9]/g, "") || "10042"}
+                  </span>
+                  <span className="text-[10px] text-slate-400 block">BlueDart Express</span>
+                </div>
+
+                <div>
+                  <span className="text-[10px] uppercase font-semibold text-slate-400 block">
+                    Status
+                  </span>
+                  <span className="font-semibold text-purple-700 text-sm">
+                    {quotation.status === "APPROVED" || quotation.status === "ACCEPTED" || quotation.status === "SENT"
+                      ? "Packed"
+                      : "Pending Approval"}
+                  </span>
+                  <span className="text-[10px] text-slate-400 block">
+                    {quotation.status === "APPROVED" || quotation.status === "ACCEPTED" || quotation.status === "SENT"
+                      ? "Consignment Sealed"
+                      : "Awaiting Clearance"}
+                  </span>
+                </div>
+
+                <div>
+                  <span className="text-[10px] uppercase font-semibold text-slate-400 block">
+                    Expected Delivery
+                  </span>
+                  <span className="font-semibold text-blue-700 text-sm">
+                    {quotation.status === "APPROVED" || quotation.status === "ACCEPTED" || quotation.status === "SENT"
+                      ? "Tomorrow"
+                      : "Post-approval"}
+                  </span>
+                  <span className="text-[10px] text-slate-400 block">
+                    {quotation.status === "APPROVED" || quotation.status === "ACCEPTED" || quotation.status === "SENT"
+                      ? "By 2:00 PM"
+                      : "Estimated 1-2 Days"}
+                  </span>
+                </div>
+              </div>
+            </div>
           </div>
+
+          {/* Beautiful Vertical Shipment Lifecycle Timeline */}
+          <ShipmentTimeline
+            quotationNumber={quotation.quotationNumber}
+            shipmentNumber={`SHP-${quotation.quotationNumber.replace(/[^0-9]/g, "") || "10042"}`}
+            currentStatus={
+              quotation.status === "APPROVED" || quotation.status === "ACCEPTED" || quotation.status === "SENT"
+                ? "PACKED"
+                : "PLANNED"
+            }
+          />
 
           {/* Rule Engine Inventory Validation & Governance */}
           <RuleEngineInventoryStatusWidget
