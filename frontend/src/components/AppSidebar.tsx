@@ -1,8 +1,15 @@
 "use client";
 
 import React from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 export const AppSidebar: React.FC = () => {
+  const pathname = usePathname();
+  const isApprovals = pathname === "/approvals" || pathname.startsWith("/approvals");
+  const isDashboard = !isApprovals && (pathname === "/dashboard" || pathname.startsWith("/dashboard"));
+  const isQuotations = !isApprovals && !isDashboard && (pathname === "/" || pathname.startsWith("/quotations"));
+
   return (
     <aside className="w-[260px] h-screen bg-surface-container-lowest border-r border-[#E5E7EB] flex flex-col justify-between flex-shrink-0 z-30 select-none">
       <div className="flex flex-col h-full overflow-y-auto">
@@ -19,10 +26,13 @@ export const AppSidebar: React.FC = () => {
 
         {/* Quick CTA Button */}
         <div className="p-space-base pb-space-xs">
-          <button className="w-full flex items-center justify-center gap-space-xs px-space-md py-[7px] rounded-lg bg-primary hover:bg-[#1E3A8A] text-on-primary font-label-md text-label-md font-semibold transition-colors duration-150 shadow-sm">
+          <Link
+            href="/"
+            className="w-full flex items-center justify-center gap-space-xs px-space-md py-[7px] rounded-lg bg-primary hover:bg-[#1E3A8A] text-on-primary font-label-md text-label-md font-semibold transition-colors duration-150 shadow-sm"
+          >
             <span className="material-symbols-outlined" data-icon="add_circle">add_circle</span>
             <span>Create Quotation</span>
-          </button>
+          </Link>
         </div>
 
         {/* Nav Section: Overview */}
@@ -34,28 +44,70 @@ export const AppSidebar: React.FC = () => {
           </a>
         </div>
 
-        {/* Nav Section: Sales Group (Quotations Active) */}
+        {/* Nav Section: Sales Group */}
         <div className="px-space-sm mt-space-md">
           <div className="px-space-sm py-1 font-label-sm text-[10px] uppercase font-bold text-outline tracking-wider">Sales</div>
-          <a className="flex items-center gap-space-sm px-space-md py-[6px] rounded-lg text-on-surface-variant font-body-md text-body-md hover:bg-surface-container-low transition-colors duration-150" href="#">
-            <span className="material-symbols-outlined text-outline" data-icon="trending_up">trending_up</span>
+          
+          {/* Dashboard Item */}
+          <Link
+            href="/dashboard"
+            className={`flex items-center gap-space-sm px-space-md py-[6px] rounded-lg transition-colors duration-150 ${
+              isDashboard
+                ? "bg-surface-container-low text-primary font-title-md text-body-md font-semibold"
+                : "text-on-surface-variant font-body-md text-body-md hover:bg-surface-container-low"
+            }`}
+          >
+            <span className={`material-symbols-outlined ${isDashboard ? "text-primary" : "text-outline"}`} data-icon="trending_up">
+              trending_up
+            </span>
             <span>Dashboard</span>
-          </a>
-          {/* Active Item: Quotations */}
-          <a className="flex items-center justify-between px-space-md py-[6px] rounded-lg bg-surface-container-low text-primary font-title-md text-body-md font-semibold transition-colors duration-150" href="#">
+          </Link>
+
+          {/* Quotations Item */}
+          <Link
+            href="/"
+            className={`flex items-center justify-between px-space-md py-[6px] rounded-lg transition-colors duration-150 ${
+              isQuotations
+                ? "bg-surface-container-low text-primary font-title-md text-body-md font-semibold"
+                : "text-on-surface-variant font-body-md text-body-md hover:bg-surface-container-low"
+            }`}
+          >
             <div className="flex items-center gap-space-sm">
-              <span className="material-symbols-outlined text-primary" data-icon="request_quote">request_quote</span>
+              <span className={`material-symbols-outlined ${isQuotations ? "text-primary" : "text-outline"}`} data-icon="request_quote">
+                request_quote
+              </span>
               <span>Quotations</span>
             </div>
-            <span className="px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-surface-container-highest text-primary">12</span>
-          </a>
-          <a className="flex items-center justify-between px-space-md py-[6px] rounded-lg text-on-surface-variant font-body-md text-body-md hover:bg-surface-container-low transition-colors duration-150" href="#">
+            <span
+              className={`px-1.5 py-0.5 rounded-full text-[10px] font-semibold ${
+                isQuotations
+                  ? "bg-surface-container-highest text-primary"
+                  : "bg-surface-container-high text-outline"
+              }`}
+            >
+              12
+            </span>
+          </Link>
+
+          {/* Approvals Item */}
+          <Link
+            href="/approvals"
+            className={`flex items-center justify-between px-space-md py-[6px] rounded-lg transition-colors duration-150 ${
+              isApprovals
+                ? "bg-surface-container-low text-primary font-title-md text-body-md font-semibold"
+                : "text-on-surface-variant font-body-md text-body-md hover:bg-surface-container-low"
+            }`}
+          >
             <div className="flex items-center gap-space-sm">
-              <span className="material-symbols-outlined text-outline" data-icon="verified_user">verified_user</span>
+              <span className={`material-symbols-outlined ${isApprovals ? "text-primary" : "text-outline"}`} data-icon="verified_user">
+                verified_user
+              </span>
               <span>Approvals</span>
             </div>
-            <span className="px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-[#FFFBEB] text-[#92400E] border border-[#FDE68A]">2</span>
-          </a>
+            <span className="px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-[#FFFBEB] text-[#92400E] border border-[#FDE68A]">
+              2
+            </span>
+          </Link>
         </div>
 
         {/* Nav Section: Operations */}
