@@ -125,6 +125,58 @@ export async function getCounterfactualRecommendations(quotationId: string, auth
 
   // Generate counterfactual recommendations based on line items
   const recommendations = [];
+
+  // 1. Inventory & Fulfillment Counterfactuals
+  for (const li of quote.lineItems) {
+    if (li.productId) {
+      const invItems = await prisma.inventoryItem.findMany({
+        where: { productId: li.productId },
+      });
+      const avail = invItems.reduce((s: number, item: any) => s + item.quantityAvailable, 0);
+      const res = invItems.reduce((s: number, item: any) => s + item.quantityReserved, 0);
+      const free = Math.max(0, avail - res);
+
+      if (li.quantity > free && free > 0) {
+        recommendations.push({
+          id: `cf-inv-qty-${li.id}`,
+          quotationId,
+          lineItemId: li.id,
+          productName: li.productName || li.product?.name || "Product",
+          currentDiscount: Number(li.discountPercent),
+          targetDiscount: Number(li.discountPercent),
+          deltaDiscount: 0,
+          marginImprovement: 0,
+          actionType: "INVENTORY_QUANTITY_REDUCTION",
+          requestedQuantity: li.quantity,
+          availableQuantity: free,
+          approvalImpact: "Auto Approval",
+          revenueImpact: "Immediate Dispatch",
+          riskScore: 20,
+          rationale: `Reduce quantity from ${li.quantity} to ${free} units. Eliminates stock shortage, enabling Auto Approval and same-day carrier handover.`,
+        });
+
+        recommendations.push({
+          id: `cf-inv-split-${li.id}`,
+          quotationId,
+          lineItemId: li.id,
+          productName: li.productName || li.product?.name || "Product",
+          currentDiscount: Number(li.discountPercent),
+          targetDiscount: Number(li.discountPercent),
+          deltaDiscount: 0,
+          marginImprovement: 0,
+          actionType: "INVENTORY_SPLIT_SHIPMENT",
+          requestedQuantity: li.quantity,
+          availableQuantity: free,
+          approvalImpact: "Split Dispatch Authorized",
+          revenueImpact: "100% Contract Revenue Preserved",
+          riskScore: 35,
+          rationale: `Split shipment: ${free} units dispatched immediately from primary warehouse, remaining ${li.quantity - free} units fulfilled upon regional replenishment.`,
+        });
+      }
+    }
+  }
+
+  // 2. Commercial Discount Counterfactuals
   const highDiscountLines = quote.lineItems.filter((li) => Number(li.discountPercent) > 15);
 
   for (const li of highDiscountLines) {
@@ -142,6 +194,10 @@ export async function getCounterfactualRecommendations(quotationId: string, auth
       targetDiscount,
       deltaDiscount: delta,
       marginImprovement: Number(marginBoost.toFixed(1)),
+      actionType: "DISCOUNT_REDUCTION",
+      approvalImpact: "Auto Approval Threshold Satisfied",
+      revenueImpact: `+${marginBoost.toFixed(1)}% Gross Margin`,
+      riskScore: 25,
       rationale: `Cap discount on ${li.productName} to ${targetDiscount}% to recover +${marginBoost.toFixed(1)}% deal margin and satisfy auto-approval policy.`,
     });
   }
@@ -155,6 +211,10 @@ export async function getCounterfactualRecommendations(quotationId: string, auth
       targetDiscount: 8,
       deltaDiscount: 4,
       marginImprovement: 3.5,
+      actionType: "SERVICE_ATTACH",
+      approvalImpact: "Portfolio Margin Compliance",
+      revenueImpact: "+3.5% Aggregate Margin",
+      riskScore: 15,
       rationale: "Add 1-year Premier Enterprise Support (SRV-MIG) to boost aggregate contract gross margin past 38%.",
     });
   }
@@ -542,7 +602,59 @@ async function inProcessRuleEvaluation(quotationId: string) {
     explanation: `Customer account tier: ${quote.customer.tier} (Baseline governance risk factor: ${tierRisk})`,
   });
 
-  // 4. Blended Commercial Risk Rule (Pure algorithmic evaluation, NO special-case check)
+  // 4. Inventory Availability Rule
+  let totalRequestedStock = 0;
+  let totalAvailableStock = 0;
+  let totalReservedStock = 0;
+  let inventoryPassed = true;
+  const inventoryDeficitDetails: string[] = [];
+
+  for (const li of quote.lineItems) {
+    totalRequestedStock += li.quantity;
+    if (li.productId) {
+      const invItems = await prisma.inventoryItem.findMany({
+        where: { productId: li.productId },
+      });
+      const avail = invItems.reduce((s: number, item: any) => s + item.quantityAvailable, 0);
+      const res = invItems.reduce((s: number, item: any) => s + item.quantityReserved, 0);
+      const free = Math.max(0, avail);
+
+      totalAvailableStock += avail;
+      totalReservedStock += res;
+
+      if (li.quantity > free) {
+        inventoryPassed = false;
+        inventoryDeficitDetails.push(
+          `${li.productName}: requested ${li.quantity}, available ${free} (reserved: ${res})`
+        );
+      }
+    }
+  }
+
+  const totalFreeStock = Math.max(0, totalAvailableStock - totalReservedStock);
+  if (!inventoryPassed) highestRisk = Math.max(highestRisk, 68);
+
+  results.push({
+    ruleId: "inventory-availability",
+    ruleName: "Inventory Availability Rule",
+    computedValue: totalFreeStock,
+    threshold: totalRequestedStock,
+    outcome: inventoryPassed ? RuleOutcome.PASS : RuleOutcome.FAIL,
+    severity: inventoryPassed ? "INFO" : "WARNING",
+    score: inventoryPassed ? 5 : 68,
+    explanation: inventoryPassed
+      ? `Sufficient inventory available across regional fulfillment hubs (Free stock: ${totalFreeStock}, Requested: ${totalRequestedStock}).`
+      : `Requested quantity exceeds available stock. Available: ${totalFreeStock}, Requested: ${totalRequestedStock}. Manager approval or split shipment required.`,
+    inputs: {
+      requestedQuantity: totalRequestedStock,
+      availableQuantity: totalAvailableStock,
+      reservedQuantity: totalReservedStock,
+      freeStock: totalFreeStock,
+      deficits: inventoryDeficitDetails,
+    },
+  } as any);
+
+  // 5. Blended Commercial Risk Rule (Pure algorithmic evaluation, NO special-case check)
   const finalRiskScore = highestRisk;
 
   results.push({
@@ -560,7 +672,7 @@ async function inProcessRuleEvaluation(quotationId: string) {
   await prisma.$transaction(async (tx) => {
     await tx.ruleEvaluation.deleteMany({ where: { quotationId } });
     await tx.ruleEvaluation.createMany({
-      data: results.map((r) => ({
+      data: results.map((r: any) => ({
         quotationId,
         ruleId: r.ruleId,
         ruleName: r.ruleName,
@@ -571,6 +683,7 @@ async function inProcessRuleEvaluation(quotationId: string) {
         metadata: {
           computedValue: r.computedValue,
           threshold: r.threshold,
+          ...(r.inputs ? { inputs: r.inputs } : {}),
         },
       })),
     });
