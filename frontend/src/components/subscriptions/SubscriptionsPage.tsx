@@ -21,9 +21,16 @@ const intervalOptions: BillingInterval[] = ["Monthly", "Quarterly", "Yearly"];
 const statusOptions: Array<"All" | SubscriptionStatus> = ["All", "Active", "Past Due", "Pending Cancellation", "Paused"];
 const filterIntervals: Array<"All" | BillingInterval> = ["All", "Monthly", "Quarterly", "Annual", "Yearly"];
 
-export function SubscriptionsPage() {
-  const [subscriptions, setSubscriptions] = useState<Subscription[]>(initialSubscriptions);
-  const [selectedId, setSelectedId] = useState("SUB-1042");
+interface SubscriptionsPageProps {
+  initialData?: {
+    subscriptions: Subscription[];
+    subscriptionStats: any[];
+  };
+}
+
+export function SubscriptionsPage({ initialData }: SubscriptionsPageProps) {
+  const [subscriptions, setSubscriptions] = useState<Subscription[]>(initialData?.subscriptions || initialSubscriptions);
+  const [selectedId, setSelectedId] = useState(initialData?.subscriptions[0]?.id || "SUB-1042");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"All" | SubscriptionStatus>("All");
   const [intervalFilter, setIntervalFilter] = useState<"All" | BillingInterval>("All");
@@ -93,7 +100,27 @@ export function SubscriptionsPage() {
       {dialog === "quantity" && <QuantityDialog subscription={selectedSubscription} quantity={quantityDraft} onQuantityChange={setQuantityDraft} onClose={() => setDialog(null)} onSave={() => { updateSelectedSubscription({ quantity: quantityDraft }); setShowPreview(true); setDialog(null); }} />}
       {dialog === "cancel" && <CancellationDialog subscription={selectedSubscription} onClose={() => setDialog(null)} />}
       {dialog === "invoices" && <InvoicePreviewDialog invoices={invoicePreview} subscription={selectedSubscription} onClose={() => setDialog(null)} />}
-      {dialog === "manage" && <ManageDialog subscription={selectedSubscription} onClose={() => setDialog(null)} />}
+      {dialog === "manage" && (
+        <ManageDialog
+          subscription={selectedSubscription}
+          onClose={() => setDialog(null)}
+          onTogglePause={async () => {
+            const nextStatus: SubscriptionStatus = selectedSubscription.status === "Paused" ? "Active" : "Paused";
+            try {
+              const { pauseSubscriptionServerAction, resumeSubscriptionServerAction } = await import("@/lib/actions/subscriptionActions");
+              if (nextStatus === "Paused") {
+                await pauseSubscriptionServerAction(selectedSubscription.id);
+              } else {
+                await resumeSubscriptionServerAction(selectedSubscription.id);
+              }
+              updateSelectedSubscription({ status: nextStatus, paymentStatus: nextStatus === "Paused" ? "Paused" : "Paid / Up to Date" });
+            } catch (err) {
+              console.error("Failed to toggle pause status:", err);
+            }
+            setDialog(null);
+          }}
+        />
+      )}
     </>
   );
 }
@@ -215,9 +242,47 @@ function InvoicePreviewDialog({ subscription, invoices, onClose }: { subscriptio
   return <Dialog title={`Invoices for ${subscription.id}`} onClose={onClose}><div className="divide-y divide-[#F1F5F9]">{invoices.map((invoice) => <div key={invoice.id} className="grid grid-cols-[1fr_110px_90px] py-2 font-body-sm text-body-sm"><span className="font-code-tabular font-semibold text-on-surface">{invoice.id}<span className="block font-normal text-outline">{invoice.date}</span></span><span className="text-right font-code-tabular tnum font-semibold text-on-surface">{money(invoice.amount)}</span><span className="justify-self-end">{invoice.status === "Paid" ? successBadgeNode(invoice.status) : invoice.status === "Upcoming" ? infoBadgeNode(invoice.status) : neutralBadgeNode(invoice.status)}</span></div>)}</div></Dialog>;
 }
 
-function ManageDialog({ subscription, onClose }: { subscription: Subscription; onClose: () => void }) {
-  return <Dialog title="Manage Subscription" onClose={onClose}><div className="flex items-start gap-3"><span className="material-symbols-outlined text-primary text-2xl">settings</span><p className="font-body-sm text-body-sm text-on-surface-variant">{subscription.id} is editable in this frontend session only. Billing mutations, payment operations, invoice posting, dunning and renewal processing will be connected later.</p></div><div className="flex justify-end mt-space-lg"><button onClick={onClose} className={primaryButton}>Done</button></div></Dialog>;
+function ManageDialog({ subscription, onClose, onTogglePause }: { subscription: Subscription; onClose: () => void; onTogglePause: () => void }) {
+  const isPaused = subscription.status === "Paused";
+  return (
+    <Dialog title="Manage Subscription" onClose={onClose}>
+      <div className="space-y-4">
+        <div className="flex items-start gap-3">
+          <span className="material-symbols-outlined text-primary text-2xl">settings</span>
+          <div>
+            <h4 className="font-title-md text-xs font-bold text-on-surface">{subscription.id} - {subscription.plan}</h4>
+            <p className="font-body-sm text-body-sm text-on-surface-variant mt-1">
+              Active recurring agreement for {subscription.customer}. Status: <strong className="text-primary">{subscription.status}</strong>.
+            </p>
+          </div>
+        </div>
+        <div className="p-3 bg-slate-50 border border-[#E5E7EB] rounded-lg flex items-center justify-between">
+          <div>
+            <span className="font-label-md text-xs font-semibold text-on-surface block">
+              {isPaused ? "Resume Commercial Subscription" : "Pause Subscription Billing"}
+            </span>
+            <span className="text-[11px] text-outline">
+              {isPaused ? "Re-enable recurring invoices and MRR accrual." : "Temporarily suspend dunning and invoice generation."}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={onTogglePause}
+            className={`px-3 py-1.5 rounded text-xs font-semibold text-white transition-colors ${
+              isPaused ? "bg-[#065F46] hover:bg-[#047857]" : "bg-[#D97706] hover:bg-[#B45309]"
+            }`}
+          >
+            {isPaused ? "Resume Subscription" : "Pause Subscription"}
+          </button>
+        </div>
+      </div>
+      <div className="flex justify-end mt-space-lg">
+        <button onClick={onClose} className={primaryButton}>Done</button>
+      </div>
+    </Dialog>
+  );
 }
+
 
 function SectionBar({ title, subtitle, icon, right }: { title: string; subtitle?: string; icon: string; right?: React.ReactNode }) { return <div className="px-space-base py-space-sm border-b border-[#E5E7EB] flex items-center justify-between bg-surface-bright"><div className="flex items-center gap-2"><span className="material-symbols-outlined text-primary text-sm">{icon}</span><div><h2 className="font-title-md text-title-md font-semibold text-on-surface">{title}</h2>{subtitle && <p className="font-body-sm text-[11px] text-outline">{subtitle}</p>}</div></div>{right}</div>; }
 function Detail({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) { return <div><span className="block font-label-sm text-[10px] uppercase tracking-wider text-outline">{label}</span><span className={`font-title-md text-body-md font-semibold ${highlight ? "font-code-tabular tnum text-on-surface" : "text-on-surface"}`}>{value}</span></div>; }

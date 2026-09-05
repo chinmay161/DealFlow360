@@ -47,12 +47,16 @@ export const AppSidebar: React.FC = () => {
       .join("") || "CU";
   const avatarUrl = session?.user?.image;
 
+  const isOverview = pathname === "/overview" || pathname.startsWith("/overview");
   const isApprovals = pathname === "/approvals" || pathname.startsWith("/approvals");
-  const isDashboard = !isApprovals && (pathname === "/dashboard" || pathname.startsWith("/dashboard"));
+  const isDashboard = !isApprovals && !isOverview && (pathname === "/dashboard" || pathname.startsWith("/dashboard"));
   const isFulfillment = pathname === "/fulfillment" || pathname.startsWith("/fulfillment/");
   const isSubscriptions = pathname === "/subscriptions" || pathname.startsWith("/subscriptions/");
   const isInvoices = pathname === "/invoices" || pathname.startsWith("/invoices/");
-  const isQuotations = !isApprovals && !isDashboard && !isFulfillment && !isSubscriptions && !isInvoices && (pathname === "/" || pathname.startsWith("/quotations"));
+  const isReports = pathname === "/reports" || pathname.startsWith("/reports/");
+  const isPortal = pathname === "/portal" || pathname.startsWith("/portal/");
+
+  const isQuotations = !isApprovals && !isDashboard && !isOverview && !isFulfillment && !isSubscriptions && !isInvoices && (pathname === "/" || pathname.startsWith("/quotations"));
 
   return (
     <aside className="w-[260px] h-screen bg-surface-container-lowest border-r border-[#E5E7EB] flex flex-col justify-between flex-shrink-0 z-30 select-none">
@@ -71,7 +75,7 @@ export const AppSidebar: React.FC = () => {
         {/* Quick CTA Button */}
         <div className="p-space-base pb-space-xs">
           <Link
-            href="/"
+            href="/quotations/new"
             className="w-full flex items-center justify-center gap-space-xs px-space-md py-[7px] rounded-lg bg-primary hover:bg-[#1E3A8A] text-on-primary font-label-md text-label-md font-semibold transition-colors duration-150 shadow-sm"
           >
             <span className="material-symbols-outlined" data-icon="add_circle">add_circle</span>
@@ -82,10 +86,22 @@ export const AppSidebar: React.FC = () => {
         {/* Nav Section: Overview */}
         <div className="px-space-sm mt-space-sm">
           <div className="px-space-sm py-1 font-label-sm text-[10px] uppercase font-bold text-outline tracking-wider">Core</div>
-          <a className="flex items-center gap-space-sm px-space-md py-[6px] rounded-lg text-on-surface-variant font-body-md text-body-md hover:bg-surface-container-low transition-colors duration-150" href="#">
-            <span className="material-symbols-outlined text-outline" data-icon="dashboard">dashboard</span>
+          <Link
+            href="/overview"
+            className={`flex items-center gap-space-sm px-space-md py-[6px] rounded-lg transition-colors duration-150 ${
+              isOverview
+                ? "bg-surface-container-low text-primary font-title-md text-body-md font-semibold"
+                : "text-on-surface-variant font-body-md text-body-md hover:bg-surface-container-low"
+            }`}
+          >
+            <span
+              className={`material-symbols-outlined ${isOverview ? "text-primary" : "text-outline"}`}
+              data-icon="dashboard"
+            >
+              dashboard
+            </span>
             <span>Overview</span>
-          </a>
+          </Link>
         </div>
 
         {/* Nav Section: Sales Group */}
@@ -109,7 +125,7 @@ export const AppSidebar: React.FC = () => {
 
           {/* Quotations Item */}
           <Link
-            href="/"
+            href="/quotations"
             className={`flex items-center justify-between px-space-md py-[6px] rounded-lg transition-colors duration-150 ${
               isQuotations
                 ? "bg-surface-container-low text-primary font-title-md text-body-md font-semibold"
@@ -195,16 +211,43 @@ export const AppSidebar: React.FC = () => {
         {/* Nav Section: Intelligence */}
         <div className="px-space-sm mt-space-md">
           <div className="px-space-sm py-1 font-label-sm text-[10px] uppercase font-bold text-outline tracking-wider">Intelligence</div>
-          <a className="flex items-center gap-space-sm px-space-md py-[6px] rounded-lg text-on-surface-variant font-body-md text-body-md hover:bg-surface-container-low transition-colors duration-150" href="#">
+          <Link
+            href="/quotations"
+            className="flex items-center gap-space-sm px-space-md py-[6px] rounded-lg text-on-surface-variant font-body-md text-body-md hover:bg-surface-container-low transition-colors duration-150"
+          >
             <span className="material-symbols-outlined text-outline" data-icon="health_and_safety">health_and_safety</span>
             <span>Deal Health</span>
-          </a>
-          <a className="flex items-center gap-space-sm px-space-md py-[6px] rounded-lg text-on-surface-variant font-body-md text-body-md hover:bg-surface-container-low transition-colors duration-150" href="#">
-            <span className="material-symbols-outlined text-outline" data-icon="query_stats">query_stats</span>
+          </Link>
+          <Link
+            href="/reports"
+            className={`flex items-center gap-space-sm px-space-md py-[6px] rounded-lg transition-colors duration-150 ${
+              isReports
+                ? "bg-surface-container-low text-primary font-title-md text-body-md font-semibold"
+                : "text-on-surface-variant font-body-md text-body-md hover:bg-surface-container-low"
+            }`}
+          >
+            <span className={`material-symbols-outlined ${isReports ? "text-primary" : "text-outline"}`} data-icon="query_stats">query_stats</span>
             <span>Reports</span>
-          </a>
+          </Link>
+        </div>
+
+        {/* Nav Section: External Portal */}
+        <div className="px-space-sm mt-space-md mb-space-base">
+          <div className="px-space-sm py-1 font-label-sm text-[10px] uppercase font-bold text-outline tracking-wider">Buyer Workspace</div>
+          <Link
+            href="/portal"
+            className={`flex items-center gap-space-sm px-space-md py-[6px] rounded-lg transition-colors duration-150 ${
+              isPortal
+                ? "bg-surface-container-low text-primary font-title-md text-body-md font-semibold"
+                : "text-on-surface-variant font-body-md text-body-md hover:bg-surface-container-low"
+            }`}
+          >
+            <span className={`material-symbols-outlined ${isPortal ? "text-primary" : "text-outline"}`} data-icon="storefront">storefront</span>
+            <span>Customer Portal</span>
+          </Link>
         </div>
       </div>
+
 
       {/* Bottom User Operator Profile */}
       <div className="relative p-space-sm border-t border-[#E5E7EB] bg-surface-bright" ref={menuRef}>
