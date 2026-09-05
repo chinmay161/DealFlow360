@@ -37,6 +37,28 @@ export default async function ConfigurationPage() {
     getApprovalRules(authContext),
   ]);
 
+  const sanitizedPolicies = (policies || []).map((p: any) => ({
+    id: String(p.id),
+    name: String(p.name),
+    description: p.description ? String(p.description) : null,
+    type: String(p.type || "PERCENTAGE"),
+    value: Number(p.value ?? 0),
+    minOrderAmt: p.minOrderAmt != null ? Number(p.minOrderAmt) : null,
+    maxDiscount: p.maxDiscount != null ? Number(p.maxDiscount) : null,
+    tier: p.tier ? String(p.tier) : null,
+    isActive: Boolean(p.isActive),
+  }));
+
+  const sanitizedRules = (rules || []).map((r: any) => ({
+    id: String(r.id),
+    name: String(r.name),
+    description: r.description ? String(r.description) : null,
+    stage: Number(r.stage || 1),
+    threshold: Number(r.threshold ?? 0),
+    approverRole: String(r.approverRole || "MANAGER"),
+    isActive: Boolean(r.isActive),
+  }));
+
   return (
     <>
       <AppSidebar />
@@ -55,7 +77,7 @@ export default async function ConfigurationPage() {
               </div>
             </div>
 
-            <ConfigurationWorkspace initialPolicies={policies} initialRules={rules} />
+            <ConfigurationWorkspace initialPolicies={sanitizedPolicies} initialRules={sanitizedRules} />
           </div>
         </main>
       </div>

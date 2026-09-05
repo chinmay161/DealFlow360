@@ -37,7 +37,10 @@ export default async function CustomersPage() {
     state: c.state,
     activeStatus: (c as any).isActive ?? true,
     quotationCount: c.quotations.length,
-    primaryContact: c.contacts.find((cnt) => cnt.isPrimary) || c.contacts[0] || null,
+    primaryContact: (() => {
+      const cnt = c.contacts.find((cn) => cn.isPrimary) || c.contacts[0];
+      return cnt ? { name: cnt.name, title: cnt.title, email: cnt.email } : null;
+    })(),
   }));
 
   return (
