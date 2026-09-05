@@ -52,11 +52,11 @@ export const authConfig: NextAuthConfig = {
       if (url.startsWith("/")) {
         // Prevent open redirect attack (e.g. //attacker.com)
         if (url.startsWith("//")) {
-          return `${baseUrl}/dashboard`;
+          return `${baseUrl}/overview`;
         }
         // Never redirect back to login upon successful authentication
         if (url === "/login" || url.startsWith("/login?")) {
-          return `${baseUrl}/dashboard`;
+          return `${baseUrl}/overview`;
         }
         return `${baseUrl}${url}`;
       }
@@ -66,16 +66,16 @@ export const authConfig: NextAuthConfig = {
         const parsedUrl = new URL(url);
         if (parsedUrl.origin === baseUrl) {
           if (parsedUrl.pathname === "/login") {
-            return `${baseUrl}/dashboard`;
+            return `${baseUrl}/overview`;
           }
           return url;
         }
       } catch {
-        return `${baseUrl}/dashboard`;
+        return `${baseUrl}/overview`;
       }
 
       // Default safe landing destination
-      return `${baseUrl}/dashboard`;
+      return `${baseUrl}/overview`;
     },
     authorized({ auth, request: { nextUrl } }) {
       const isLoggedIn = !!auth?.user;
@@ -97,19 +97,19 @@ export const authConfig: NextAuthConfig = {
           if ((auth?.user as any)?.role === "CUSTOMER") {
             return Response.redirect(new URL("/customer/dashboard", nextUrl));
           }
-          return Response.redirect(new URL("/dashboard", nextUrl));
+          return Response.redirect(new URL("/overview", nextUrl));
         }
         return true;
       }
 
-      // If customer logs in or attempts to access salesman dashboard or root, redirect to customer dashboard
+      // If customer logs in or attempts to access salesman dashboard, overview or root, redirect to customer dashboard
       if (isLoggedIn && (auth?.user as any)?.role === "CUSTOMER") {
-        if (pathname === "/dashboard" || pathname === "/") {
+        if (pathname === "/dashboard" || pathname === "/overview" || pathname === "/") {
           return Response.redirect(new URL("/customer/dashboard", nextUrl));
         }
       }
 
-      // Protected routes: Quotations (/ and /quotations), Dashboard (/dashboard), Approvals (/approvals), etc.
+      // Protected routes: Overview (/ and /overview), Dashboard (/dashboard), Quotations (/quotations), etc.
       return isLoggedIn;
     },
   },

@@ -26,7 +26,7 @@ export const DashboardHeader: React.FC = () => {
 
         {/* Primary CTA: Create Quotation */}
         <Link
-          href="/"
+          href="/quotations/new"
           className="h-8 px-3 rounded-md bg-primary hover:bg-[#1E3A8A] text-on-primary font-label-md text-label-md font-semibold flex items-center gap-1.5 transition-colors shadow-sm"
         >
           <span className="material-symbols-outlined text-sm" data-icon="add_circle">

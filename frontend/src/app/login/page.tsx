@@ -23,7 +23,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   }
 
   const params = await searchParams;
-  const callbackUrl = params?.callbackUrl || "/dashboard";
+  const callbackUrl = params?.callbackUrl || "/overview";
   const isAccessDenied = params?.error === "AccessDenied";
 
   return <LoginClient callbackUrl={callbackUrl} isAccessDenied={isAccessDenied} />;

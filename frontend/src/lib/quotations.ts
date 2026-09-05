@@ -125,9 +125,13 @@ export interface SerializedApproval {
 
 export interface SerializedCustomer {
   id: string;
+  customerNumber: string | null;
   name: string;
   externalAccountId: string | null;
   industry: string | null;
+  city?: string | null;
+  state?: string | null;
+  tier?: string | null;
 }
 
 export interface SerializedOwner {
@@ -205,9 +209,13 @@ export async function getQuotations(): Promise<SerializedQuotationListItem[]> {
       customerId: q.customerId,
       customer: {
         id: q.customer.id,
+        customerNumber: q.customer.customerNumber,
         name: q.customer.name,
         externalAccountId: q.customer.externalAccountId,
         industry: q.customer.industry,
+        city: q.customer.city,
+        state: q.customer.state,
+        tier: q.customer.tier,
       },
       ownerId: q.ownerId,
       owner: {
@@ -274,9 +282,13 @@ export async function getQuotationByNumber(
       customerId: q.customerId,
       customer: {
         id: q.customer.id,
+        customerNumber: q.customer.customerNumber,
         name: q.customer.name,
         externalAccountId: q.customer.externalAccountId,
         industry: q.customer.industry,
+        city: q.customer.city,
+        state: q.customer.state,
+        tier: q.customer.tier,
       },
       ownerId: q.ownerId,
       owner: {
@@ -346,110 +358,125 @@ export async function getQuotationByNumber(
 export async function getQuotationWithLineItems(
   identifier: string
 ): Promise<SerializedQuotationDetail | null> {
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(identifier);
+
   // If starts with "Q-", query by quotationNumber first
   if (identifier.toUpperCase().startsWith("Q-")) {
     const byNumber = await getQuotationByNumber(identifier.toUpperCase());
     if (byNumber) return byNumber;
   }
 
-  // Otherwise try finding by UUID id
-  try {
-    const q = await prisma.quotation.findUnique({
-      where: { id: identifier },
-      include: {
-        customer: true,
-        owner: true,
-        lineItems: {
-          include: { product: true },
-          orderBy: { createdAt: "asc" },
-        },
-        approvals: {
-          include: {
-            requestedBy: true,
-            assignedTo: true,
-            workflowSteps: {
-              include: { approver: true },
-              orderBy: { stepOrder: "asc" },
-            },
+  // If valid UUID, query by UUID id
+  if (isUuid) {
+    try {
+      const q = await prisma.quotation.findUnique({
+        where: { id: identifier },
+        include: {
+          customer: true,
+          owner: true,
+          lineItems: {
+            include: { product: true },
+            orderBy: { createdAt: "asc" },
           },
-          orderBy: { createdAt: "desc" },
+          approvals: {
+            include: {
+              requestedBy: true,
+              assignedTo: true,
+              workflowSteps: {
+                include: { approver: true },
+                orderBy: { stepOrder: "asc" },
+              },
+            },
+            orderBy: { createdAt: "desc" },
+          },
         },
-      },
-    });
+      });
 
-    if (!q) {
-      // Last try case-insensitive quotation number lookup
-      return await getQuotationByNumber(identifier);
-    }
+      if (!q) {
+        return null;
+      }
 
-    return {
-      id: q.id,
-      quotationNumber: q.quotationNumber,
-      customerId: q.customerId,
-      customer: {
-        id: q.customer.id,
-        name: q.customer.name,
-        externalAccountId: q.customer.externalAccountId,
-        industry: q.customer.industry,
-      },
-      ownerId: q.ownerId,
-      owner: {
-        id: q.owner.id,
-        name: q.owner.name,
-        email: q.owner.email,
-        role: q.owner.role,
-        avatarUrl: q.owner.avatarUrl,
-      },
-      status: q.status,
-      currentStage: q.currentStage,
-      currency: q.currency,
-      subtotal: Number(q.subtotal),
-      discountTotal: Number(q.discountTotal),
-      taxTotal: Number(q.taxTotal),
-      totalValue: Number(q.totalValue),
-      estimatedMargin: Number(q.estimatedMargin),
-      riskScore: q.riskScore,
-      createdAt: q.createdAt.toISOString(),
-      updatedAt: q.updatedAt.toISOString(),
-      lineItems: q.lineItems.map(serializeQuoteLineItem),
-      approvals: q.approvals.map((appr) => ({
-        id: appr.id,
-        status: appr.status,
-        priority: appr.priority,
-        currentStep: appr.currentStep,
-        submittedAt: appr.submittedAt.toISOString(),
-        requestedBy: {
-          id: appr.requestedBy.id,
-          name: appr.requestedBy.name,
-          email: appr.requestedBy.email,
+      return {
+        id: q.id,
+        quotationNumber: q.quotationNumber,
+        customerId: q.customerId,
+        customer: {
+          id: q.customer.id,
+          customerNumber: q.customer.customerNumber,
+          name: q.customer.name,
+          externalAccountId: q.customer.externalAccountId,
+          industry: q.customer.industry,
+          city: q.customer.city,
+          state: q.customer.state,
+          tier: q.customer.tier,
         },
-        assignedTo: appr.assignedTo
-          ? {
-              id: appr.assignedTo.id,
-              name: appr.assignedTo.name,
-              email: appr.assignedTo.email,
-            }
-          : null,
-        workflowSteps: appr.workflowSteps.map((st) => ({
-          id: st.id,
-          stepOrder: st.stepOrder,
-          role: st.role,
-          status: st.status,
-          notes: st.notes,
-          approver: st.approver
+        ownerId: q.ownerId,
+        owner: {
+          id: q.owner.id,
+          name: q.owner.name,
+          email: q.owner.email,
+          role: q.owner.role,
+          avatarUrl: q.owner.avatarUrl,
+        },
+        status: q.status,
+        currentStage: q.currentStage,
+        currency: q.currency,
+        subtotal: Number(q.subtotal),
+        discountTotal: Number(q.discountTotal),
+        taxTotal: Number(q.taxTotal),
+        totalValue: Number(q.totalValue),
+        estimatedMargin: Number(q.estimatedMargin),
+        riskScore: q.riskScore,
+        createdAt: q.createdAt.toISOString(),
+        updatedAt: q.updatedAt.toISOString(),
+        lineItems: q.lineItems.map(serializeQuoteLineItem),
+        approvals: q.approvals.map((appr) => ({
+          id: appr.id,
+          status: appr.status,
+          priority: appr.priority,
+          currentStep: appr.currentStep,
+          submittedAt: appr.submittedAt.toISOString(),
+          requestedBy: {
+            id: appr.requestedBy.id,
+            name: appr.requestedBy.name,
+            email: appr.requestedBy.email,
+          },
+          assignedTo: appr.assignedTo
             ? {
-                id: st.approver.id,
-                name: st.approver.name,
-                email: st.approver.email,
-                role: st.approver.role,
-                avatarUrl: st.approver.avatarUrl,
+                id: appr.assignedTo.id,
+                name: appr.assignedTo.name,
+                email: appr.assignedTo.email,
               }
             : null,
+          workflowSteps: appr.workflowSteps.map((st) => ({
+            id: st.id,
+            stepOrder: st.stepOrder,
+            role: st.role,
+            status: st.status,
+            notes: st.notes,
+            approver: st.approver
+              ? {
+                  id: st.approver.id,
+                  name: st.approver.name,
+                  email: st.approver.email,
+                  role: st.approver.role,
+                  avatarUrl: st.approver.avatarUrl,
+                }
+              : null,
+          })),
         })),
-      })),
-    };
-  } catch (error) {
-    console.error(`[getQuotationWithLineItems] Database error for "${identifier}":`, error);
-    throw new Error("Unable to load quotations.");
+      };
+    } catch (error) {
+      console.error(`[getQuotationWithLineItems] Database error for UUID "${identifier}":`, error);
+      return null;
+    }
+  }
+
+  // If not UUID and doesn't start with Q-, try quotationNumber case-insensitively
+  try {
+    return await getQuotationByNumber(identifier.toUpperCase());
+  } catch {
+    return null;
   }
 }
+

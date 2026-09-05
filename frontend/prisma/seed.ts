@@ -531,6 +531,7 @@ async function main() {
   const customersData = [
     {
       id: "c-cust-0001-apex-infotech",
+      customerNumber: "CUST-00001",
       name: "Apex Infotech Pvt. Ltd.",
       externalAccountId: "AC-88219",
       industry: "Enterprise Cloud & Infrastructure",
@@ -539,6 +540,9 @@ async function main() {
       creditLimit: "25000000.00",
       creditAvailable: "18200000.00",
       territory: "South India (Bengaluru)",
+      city: "Bengaluru",
+      state: "Karnataka",
+      country: "India",
       ownerEmail: "arjun.mehta@dealflow360.in",
       createdAt: new Date("2026-06-05T09:00:00Z"),
       contacts: [
@@ -565,6 +569,7 @@ async function main() {
     },
     {
       id: "c-cust-0002-bharatgrid",
+      customerNumber: "CUST-00002",
       name: "BharatGrid Systems",
       externalAccountId: "NT-40291",
       industry: "Financial Technology & Trading",
@@ -573,6 +578,9 @@ async function main() {
       creditLimit: "50000000.00",
       creditAvailable: "41550000.00",
       territory: "North India (Gurugram)",
+      city: "Gurugram",
+      state: "Haryana",
+      country: "India",
       ownerEmail: "rohan.sharma@dealflow360.in",
       createdAt: new Date("2026-06-12T09:00:00Z"),
       contacts: [
@@ -589,6 +597,7 @@ async function main() {
     },
     {
       id: "c-cust-0003-novabyte",
+      customerNumber: "CUST-00003",
       name: "NovaByte Technologies",
       externalAccountId: "GX-77218",
       industry: "Industrial Automation & Robotics",
@@ -597,6 +606,9 @@ async function main() {
       creditLimit: "30000000.00",
       creditAvailable: "17400000.00",
       territory: "West India (Pune)",
+      city: "Pune",
+      state: "Maharashtra",
+      country: "India",
       ownerEmail: "priya.nair@dealflow360.in",
       createdAt: new Date("2026-06-15T09:00:00Z"),
       contacts: [
@@ -613,6 +625,7 @@ async function main() {
     },
     {
       id: "c-cust-0004-indus-mfg",
+      customerNumber: "CUST-00004",
       name: "Indus Manufacturing Group",
       externalAccountId: "OR-99120",
       industry: "Precision Engineering & Heavy Mfg",
@@ -621,6 +634,9 @@ async function main() {
       creditLimit: "15000000.00",
       creditAvailable: "5360000.00",
       territory: "West India (Ahmedabad)",
+      city: "Ahmedabad",
+      state: "Gujarat",
+      country: "India",
       ownerEmail: "aditya.kulkarni@dealflow360.in",
       createdAt: new Date("2026-06-18T09:00:00Z"),
       contacts: [
@@ -637,6 +653,7 @@ async function main() {
     },
     {
       id: "c-cust-0005-vistara-sol",
+      customerNumber: "CUST-00005",
       name: "Vistara Industrial Solutions",
       externalAccountId: "NS-51204",
       industry: "Telecommunications & SatCom",
@@ -645,6 +662,9 @@ async function main() {
       creditLimit: "20000000.00",
       creditAvailable: "13180000.00",
       territory: "West India (Mumbai)",
+      city: "Mumbai",
+      state: "Maharashtra",
+      country: "India",
       ownerEmail: "arjun.mehta@dealflow360.in",
       createdAt: new Date("2026-06-25T09:00:00Z"),
       contacts: [
@@ -654,222 +674,6 @@ async function main() {
           email: "s.iyer@vistara.example",
           phone: "+91 98205 55111",
           title: "VP Infrastructure",
-          isPrimary: true,
-          portalAccess: false,
-        },
-      ],
-    },
-    {
-      id: "c-cust-0006-meridian-dig",
-      name: "Meridian Digital Services",
-      externalAccountId: "HX-33104",
-      industry: "Biomedical & Genomics",
-      tier: CustomerTier.PLATINUM,
-      paymentTerms: "Net 60 Days",
-      creditLimit: "40000000.00",
-      creditAvailable: "25800000.00",
-      territory: "South India (Hyderabad)",
-      ownerEmail: "priya.nair@dealflow360.in",
-      createdAt: new Date("2026-07-01T09:00:00Z"),
-      contacts: [
-        {
-          id: "cnt-0007-dr-kavita-rao",
-          name: "Dr. Kavita Rao",
-          email: "k.rao@meridiandigital.example",
-          phone: "+91 98490 55177",
-          title: "Head of Genomic IT",
-          isPrimary: true,
-          portalAccess: true,
-        },
-      ],
-    },
-    {
-      id: "c-cust-0007-shree-logistics",
-      name: "Shree Logistics Systems",
-      externalAccountId: "NW-18492",
-      industry: "Global Logistics & Cold Chain",
-      tier: CustomerTier.SILVER,
-      paymentTerms: "Net 30 Days",
-      creditLimit: "18000000.00",
-      creditAvailable: "6500000.00",
-      territory: "South India (Chennai)",
-      ownerEmail: "rohan.sharma@dealflow360.in",
-      createdAt: new Date("2026-07-05T09:00:00Z"),
-      contacts: [
-        {
-          id: "cnt-0008-saurabh-patil",
-          name: "Saurabh Patil",
-          email: "s.patil@shreelogistics.example",
-          phone: "+91 98410 55199",
-          title: "Director Global Sourcing",
-          isPrimary: true,
-          portalAccess: false,
-        },
-      ],
-    },
-    {
-      id: "c-cust-0008-bluepeak-cloud",
-      name: "BluePeak Cloud Services",
-      externalAccountId: "VX-66190",
-      industry: "Cybersecurity & Identity",
-      tier: CustomerTier.BRONZE,
-      paymentTerms: "Net 30 Days",
-      creditLimit: "10000000.00",
-      creditAvailable: "5720000.00",
-      territory: "North India (Noida)",
-      ownerEmail: "aditya.kulkarni@dealflow360.in",
-      createdAt: new Date("2026-07-10T09:00:00Z"),
-      contacts: [
-        {
-          id: "cnt-0009-rahul-shinde",
-          name: "Rahul Shinde",
-          email: "r.shinde@bluepeak.example",
-          phone: "+91 98100 55188",
-          title: "IT Security Manager",
-          isPrimary: true,
-          portalAccess: false,
-        },
-      ],
-    },
-    {
-      id: "c-cust-0009-konkan-eng",
-      name: "Konkan Engineering Systems",
-      externalAccountId: "AL-22194",
-      industry: "Intermodal Freight & Port Mgmt",
-      tier: CustomerTier.BRONZE,
-      paymentTerms: "Net 30 Days",
-      creditLimit: "10000000.00",
-      creditAvailable: "4590000.00",
-      territory: "West India (Mumbai)",
-      ownerEmail: "arjun.mehta@dealflow360.in",
-      createdAt: new Date("2026-07-15T09:00:00Z"),
-      contacts: [
-        {
-          id: "cnt-0010-nisha-agarwal",
-          name: "Nisha Agarwal",
-          email: "n.agarwal@konkaneng.example",
-          phone: "+91 98200 55122",
-          title: "Fleet Infrastructure Director",
-          isPrimary: true,
-          portalAccess: false,
-        },
-      ],
-    },
-    {
-      id: "c-cust-0010-saffron-data",
-      name: "Saffron Data Technologies",
-      externalAccountId: "CA-99302",
-      industry: "AI Edge Computing & Vision",
-      tier: CustomerTier.SILVER,
-      paymentTerms: "Net 30 Days",
-      creditLimit: "15000000.00",
-      creditAvailable: "11510000.00",
-      territory: "South India (Bengaluru)",
-      ownerEmail: "priya.nair@dealflow360.in",
-      createdAt: new Date("2026-07-20T09:00:00Z"),
-      contacts: [
-        {
-          id: "cnt-0011-rajesh-madhav",
-          name: "Rajesh Madhav",
-          email: "r.madhav@saffrondatatech.example",
-          phone: "+91 98450 55166",
-          title: "Chief Technical Architect",
-          isPrimary: true,
-          portalAccess: false,
-        },
-      ],
-    },
-    {
-      id: "c-cust-0011-vertex-ent",
-      name: "Vertex Enterprise Networks",
-      externalAccountId: "SD-44109",
-      industry: "Aerospace & Satellite Platforms",
-      tier: CustomerTier.PLATINUM,
-      paymentTerms: "Net 60 Days",
-      creditLimit: "60000000.00",
-      creditAvailable: "39000000.00",
-      territory: "North India (New Delhi)",
-      ownerEmail: "rohan.sharma@dealflow360.in",
-      createdAt: new Date("2026-07-22T09:00:00Z"),
-      contacts: [
-        {
-          id: "cnt-0012-vivek-dravid",
-          name: "Vivek Dravid",
-          email: "v.dravid@vertexnetworks.example",
-          phone: "+91 98180 55155",
-          title: "VP Propulsion Systems",
-          isPrimary: true,
-          portalAccess: false,
-        },
-      ],
-    },
-    {
-      id: "c-cust-0012-orion-process",
-      name: "Orion Process Automation",
-      externalAccountId: "BI-11928",
-      industry: "Pharmaceutical Clinical Trials",
-      tier: CustomerTier.SILVER,
-      paymentTerms: "Net 30 Days",
-      creditLimit: "15000000.00",
-      creditAvailable: "7570000.00",
-      territory: "East India (Kolkata)",
-      ownerEmail: "aditya.kulkarni@dealflow360.in",
-      createdAt: new Date("2026-07-28T09:00:00Z"),
-      contacts: [
-        {
-          id: "cnt-0013-dr-amitava-sen",
-          name: "Dr. Amitava Sen",
-          email: "a.sen@orionprocess.example",
-          phone: "+91 98300 55143",
-          title: "Lab Informatics Director",
-          isPrimary: true,
-          portalAccess: false,
-        },
-      ],
-    },
-    {
-      id: "c-cust-0013-trident-biz",
-      name: "Trident Business Solutions",
-      externalAccountId: "QD-77192",
-      industry: "Autonomous Defense & Crypto",
-      tier: CustomerTier.PLATINUM,
-      paymentTerms: "Net 60 Days",
-      creditLimit: "75000000.00",
-      creditAvailable: "62000000.00",
-      territory: "South India (Hyderabad)",
-      ownerEmail: "arjun.mehta@dealflow360.in",
-      createdAt: new Date("2026-08-01T09:00:00Z"),
-      contacts: [
-        {
-          id: "cnt-0014-karan-malhotra",
-          name: "Karan Malhotra",
-          email: "k.malhotra@tridentsolutions.example",
-          phone: "+91 98499 55182",
-          title: "Chief Cryptographer",
-          isPrimary: true,
-          portalAccess: false,
-        },
-      ],
-    },
-    {
-      id: "c-cust-0014-nextwave",
-      name: "NextWave Enterprise Services",
-      externalAccountId: "MH-88102",
-      industry: "Hospital Systems & Telehealth",
-      tier: CustomerTier.GOLD,
-      paymentTerms: "Net 45 Days",
-      creditLimit: "35000000.00",
-      creditAvailable: "29000000.00",
-      territory: "South India (Kochi)",
-      ownerEmail: "priya.nair@dealflow360.in",
-      createdAt: new Date("2026-08-05T09:00:00Z"),
-      contacts: [
-        {
-          id: "cnt-0015-monica-joseph",
-          name: "Monica Joseph",
-          email: "m.joseph@nextwave.example",
-          phone: "+91 98460 55139",
-          title: "VP Clinical Operations",
           isPrimary: true,
           portalAccess: false,
         },
@@ -886,6 +690,7 @@ async function main() {
     const cust = await prisma.customer.upsert({
       where: { id: custId },
       update: {
+        customerNumber: c.customerNumber,
         name: c.name,
         externalAccountId: c.externalAccountId,
         industry: c.industry,
@@ -894,10 +699,14 @@ async function main() {
         creditLimit: c.creditLimit,
         creditAvailable: c.creditAvailable,
         territory: c.territory,
+        city: c.city,
+        state: c.state,
+        country: c.country,
         ownerId,
       },
       create: {
         id: custId,
+        customerNumber: c.customerNumber,
         name: c.name,
         externalAccountId: c.externalAccountId,
         industry: c.industry,
@@ -906,6 +715,9 @@ async function main() {
         creditLimit: c.creditLimit,
         creditAvailable: c.creditAvailable,
         territory: c.territory,
+        city: c.city,
+        state: c.state,
+        country: c.country,
         ownerId,
         createdAt: c.createdAt,
       },
@@ -940,6 +752,52 @@ async function main() {
       });
     }
   }
+
+  // Prune non-retained customer relations safely
+  const retainedCustomerUuids = customersData.map((c) => toUUID(c.id));
+  const defaultRetainedId = seededCustomers["AC-88219"];
+
+  // Migrate existing quotations in DB referencing obsolete customer IDs
+  await prisma.quotation.updateMany({
+    where: {
+      customerId: {
+        notIn: retainedCustomerUuids,
+      },
+    },
+    data: {
+      customerId: defaultRetainedId,
+    },
+  });
+
+  // Migrate existing subscriptions in DB referencing obsolete customer IDs
+  await prisma.subscription.updateMany({
+    where: {
+      customerId: {
+        notIn: retainedCustomerUuids,
+      },
+    },
+    data: {
+      customerId: defaultRetainedId,
+    },
+  });
+
+  // Delete contacts belonging to non-retained customers
+  await prisma.contact.deleteMany({
+    where: {
+      customerId: {
+        notIn: retainedCustomerUuids,
+      },
+    },
+  });
+
+  // Delete non-retained customers
+  await prisma.customer.deleteMany({
+    where: {
+      id: {
+        notIn: retainedCustomerUuids,
+      },
+    },
+  });
 
   // =========================================================================
   // 5. PRICE LISTS & PRODUCT OVERRIDES (Standard, Enterprise, Gold)
@@ -1365,8 +1223,8 @@ async function main() {
       arr: "720000.00",
     },
     {
-      id: "sub-0003-meridian-sla",
-      customerAccountId: "HX-33104",
+      id: "sub-0003-novabyte-sla",
+      customerAccountId: "GX-77218",
       planCode: "PLAN-SLA-A",
       status: "ACTIVE",
       currentPeriodStart: new Date("2026-07-01T00:00:00Z"),
@@ -1604,7 +1462,7 @@ async function main() {
     {
       id: "q-1048-shree-logistics",
       quotationNumber: "Q-1048",
-      customerAccountId: "NW-18492",
+      customerAccountId: "NS-51204",
       ownerEmail: "rohan.sharma@dealflow360.in",
       status: QuotationStatus.APPROVED,
       currentStage: "Order Created",
@@ -1793,12 +1651,12 @@ async function main() {
     },
 
     // -----------------------------------------------------------------------
-    // Q-1045: Hybrid One-Time + Recurring Case (Meridian Digital, ₹1,42,00,000, Risk 61)
+    // Q-1045: Hybrid One-Time + Recurring Case (NovaByte, ₹1,42,00,000, Risk 61)
     // -----------------------------------------------------------------------
     {
       id: "q-1045-meridian-dig",
       quotationNumber: "Q-1045",
-      customerAccountId: "HX-33104",
+      customerAccountId: "GX-77218",
       ownerEmail: "priya.nair@dealflow360.in",
       status: QuotationStatus.IN_REVIEW,
       currentStage: "Contract Negotiation",
@@ -1902,7 +1760,7 @@ async function main() {
     {
       id: "q-1052-vertex-ent",
       quotationNumber: "Q-1052",
-      customerAccountId: "SD-44109",
+      customerAccountId: "NT-40291",
       ownerEmail: "rohan.sharma@dealflow360.in",
       status: QuotationStatus.IN_REVIEW,
       currentStage: "Executive Governance",
@@ -2015,7 +1873,7 @@ async function main() {
     {
       id: "q-1022-orion-process",
       quotationNumber: "Q-1022",
-      customerAccountId: "BI-11928",
+      customerAccountId: "OR-99120",
       ownerEmail: "aditya.kulkarni@dealflow360.in",
       status: QuotationStatus.REJECTED,
       currentStage: "Proposal Rejected",
@@ -2086,7 +1944,7 @@ async function main() {
     {
       id: "q-1050-saffron-data",
       quotationNumber: "Q-1050",
-      customerAccountId: "CA-99302",
+      customerAccountId: "AC-88219",
       ownerEmail: "priya.nair@dealflow360.in",
       status: QuotationStatus.DRAFT,
       currentStage: "Drafting",
@@ -2257,7 +2115,7 @@ async function main() {
     {
       id: "q-1031-konkan-eng",
       quotationNumber: "Q-1031",
-      customerAccountId: "AL-22194",
+      customerAccountId: "NS-51204",
       ownerEmail: "arjun.mehta@dealflow360.in",
       status: QuotationStatus.IN_REVIEW,
       currentStage: "Sales Review",
@@ -2287,7 +2145,7 @@ async function main() {
     {
       id: "q-1037-konkan-eng",
       quotationNumber: "Q-1037",
-      customerAccountId: "AL-22194",
+      customerAccountId: "NS-51204",
       ownerEmail: "arjun.mehta@dealflow360.in",
       status: QuotationStatus.APPROVED,
       currentStage: "Fulfillment Planning",

@@ -47,20 +47,23 @@ export class DecisionTraceService {
   async getTrace(quotationId: string): Promise<DecisionTrace> {
     const evaluations = await this.prisma.ruleEvaluation.findMany({
       where: { quotationId },
-      orderBy: { evaluatedAt: "asc" },
+      orderBy: { createdAt: "asc" },
     });
 
-    const entries: DecisionTraceEntry[] = evaluations.map((e) => ({
-      id: e.id,
-      ruleName: e.ruleName,
-      outcome: e.outcome,
-      computedValue: Number(e.computedValue),
-      threshold: Number(e.threshold),
-      explanation: e.explanation,
-      inputs: e.inputs,
-      evaluatedAt: e.evaluatedAt,
-      ruleId: e.ruleId,
-    }));
+    const entries: DecisionTraceEntry[] = evaluations.map((e) => {
+      const meta = (e.metadata as Record<string, any>) || {};
+      return {
+        id: e.id,
+        ruleName: e.ruleName,
+        outcome: e.outcome,
+        computedValue: Number(meta.computedValue ?? 0),
+        threshold: Number(meta.threshold ?? 0),
+        explanation: e.message,
+        inputs: meta.metadata ?? meta,
+        evaluatedAt: e.createdAt,
+        ruleId: e.ruleId,
+      };
+    });
 
     const summary = {
       total: entries.length,

@@ -22,9 +22,16 @@ const typeOptions: Array<"All" | InvoiceType> = ["All", "One-Time", "Recurring",
 const dateOptions: Array<"All" | DateRange> = ["All", "This Week", "This Month", "Last Month"];
 const paymentMethods: PaymentMethod[] = ["Bank Transfer", "Credit Card", "Other"];
 
-export function InvoicesPage() {
-  const [invoices, setInvoices] = useState<Invoice[]>(initialInvoices);
-  const [selectedId, setSelectedId] = useState("INV-2042");
+interface InvoicesPageProps {
+  initialData?: {
+    invoices: Invoice[];
+    invoiceStats: any[];
+  };
+}
+
+export function InvoicesPage({ initialData }: InvoicesPageProps) {
+  const [invoices, setInvoices] = useState<Invoice[]>(initialData?.invoices || initialInvoices);
+  const [selectedId, setSelectedId] = useState(initialData?.invoices[0]?.id || "INV-2042");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"All" | InvoiceStatus>("All");
   const [typeFilter, setTypeFilter] = useState<"All" | InvoiceType>("All");
@@ -52,29 +59,53 @@ export function InvoicesPage() {
     });
   }, [dateFilter, invoices, search, statusFilter, typeFilter]);
 
-  const recordPayment = () => {
+  const recordPayment = async () => {
     const amount = Math.max(0, Number.parseFloat(paymentAmount) || 0);
-    setInvoices((current) => current.map((invoice) => {
-      if (invoice.id !== selectedInvoice.id) return invoice;
-      const paid = Math.min(invoice.total, invoice.paid + amount);
-      const balanceDue = Math.max(0, invoice.total - paid);
-      const status: InvoiceStatus = balanceDue === 0 ? "Paid" : paid > 0 ? "Partially Paid" : invoice.status;
-      return { ...invoice, paid, balanceDue, status };
-    }));
-    setMessage(`${money(amount)} recorded by ${paymentMethod} in this local session.`);
+    try {
+      const { recordPaymentServerAction } = await import("@/lib/actions/billingActions");
+      await recordPaymentServerAction({
+        invoiceNumber: selectedInvoice.id,
+        amount,
+        method: paymentMethod,
+      });
+
+      setInvoices((current) => current.map((invoice) => {
+        if (invoice.id !== selectedInvoice.id) return invoice;
+        const paid = Math.min(invoice.total, invoice.paid + amount);
+        const balanceDue = Math.max(0, invoice.total - paid);
+        const status: InvoiceStatus = balanceDue === 0 ? "Paid" : paid > 0 ? "Partially Paid" : invoice.status;
+        return { ...invoice, paid, balanceDue, status };
+      }));
+      setMessage(`${money(amount)} payment recorded and saved to database successfully.`);
+    } catch (err) {
+      console.error("Failed to record payment:", err);
+      setMessage("Failed to record payment.");
+    }
     setDialog(null);
   };
 
-  const createCreditNote = () => {
+  const createCreditNote = async () => {
     const amount = Math.max(0, Number.parseFloat(creditAmount) || 0);
-    setCreditNotes((current) => [...current, { invoiceId: selectedInvoice.id, reason: creditReason, amount }]);
-    setInvoices((current) => current.map((invoice) => {
-      if (invoice.id !== selectedInvoice.id) return invoice;
-      const balanceDue = Math.max(0, invoice.balanceDue - amount);
-      const status: InvoiceStatus = balanceDue === 0 ? "Paid" : invoice.paid > 0 ? "Partially Paid" : invoice.status;
-      return { ...invoice, balanceDue, status };
-    }));
-    setMessage(`Credit note preview for ${money(amount)} created locally.`);
+    try {
+      const { issueCreditNoteServerAction } = await import("@/lib/actions/billingActions");
+      await issueCreditNoteServerAction({
+        invoiceNumber: selectedInvoice.id,
+        amount,
+        reason: creditReason,
+      });
+
+      setCreditNotes((current) => [...current, { invoiceId: selectedInvoice.id, reason: creditReason, amount }]);
+      setInvoices((current) => current.map((invoice) => {
+        if (invoice.id !== selectedInvoice.id) return invoice;
+        const balanceDue = Math.max(0, invoice.balanceDue - amount);
+        const status: InvoiceStatus = balanceDue === 0 ? "Paid" : invoice.paid > 0 ? "Partially Paid" : invoice.status;
+        return { ...invoice, balanceDue, status };
+      }));
+      setMessage(`Credit note for ${money(amount)} issued and saved to database.`);
+    } catch (err) {
+      console.error("Failed to issue credit note:", err);
+      setMessage("Failed to issue credit note.");
+    }
     setDialog(null);
   };
 

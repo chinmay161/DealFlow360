@@ -18,6 +18,7 @@ interface CustomerSummaryProps {
 
 interface CustomerOption {
   id: string;
+  customerNumber: string | null;
   name: string;
   externalAccountId: string | null;
   industry: string | null;
@@ -26,6 +27,8 @@ interface CustomerOption {
   creditLimit: number;
   creditAvailable: number;
   territory: string | null;
+  city?: string | null;
+  state?: string | null;
   primaryContact: { name: string; title: string | null; email: string } | null;
 }
 
@@ -98,6 +101,7 @@ export const CustomerSummary: React.FC<CustomerSummaryProps> = ({
   const filteredCustomers = customers.filter(
     (c) =>
       c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (c.customerNumber && c.customerNumber.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (c.externalAccountId && c.externalAccountId.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (c.industry && c.industry.toLowerCase().includes(searchTerm.toLowerCase()))
   );
@@ -130,9 +134,14 @@ export const CustomerSummary: React.FC<CustomerSummaryProps> = ({
             <span className="font-title-md text-title-md font-semibold text-on-surface truncate group-hover:text-primary transition-colors">
               {customerName}
             </span>
+            {customer?.customerNumber && (
+              <span className="px-1.5 py-0.5 rounded font-mono text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-200">
+                {customer.customerNumber}
+              </span>
+            )}
           </div>
           <span className="font-body-sm text-[11px] text-outline mt-0.5 block truncate">
-            {industryText} • ID: {accountId}
+            {customer?.customerNumber ? `${customer.customerNumber} • ` : ""}{industryText} • ID: {accountId}
           </span>
         </div>
 
@@ -249,6 +258,11 @@ export const CustomerSummary: React.FC<CustomerSummaryProps> = ({
                           <span className="font-title-md text-body-md font-semibold text-on-surface">
                             {c.name}
                           </span>
+                          {c.customerNumber && (
+                            <span className="px-1.5 py-0.5 rounded font-mono text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-200">
+                              {c.customerNumber}
+                            </span>
+                          )}
                           <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
                             c.tier === "GOLD"
                               ? "bg-[#FFFBEB] text-[#92400E] border border-[#FDE68A]"
@@ -260,7 +274,7 @@ export const CustomerSummary: React.FC<CustomerSummaryProps> = ({
                           </span>
                         </div>
                         <div className="font-body-sm text-[11px] text-outline mt-0.5">
-                          ID: {c.externalAccountId || "N/A"} • {c.industry || "General Commercial"} • Terms: {c.paymentTerms || "Net 30"}
+                          {c.customerNumber ? `${c.customerNumber} • ` : ""}ID: {c.externalAccountId || "N/A"} • {c.industry || "General Commercial"} • Terms: {c.paymentTerms || "Net 30"}
                         </div>
                       </div>
                       <div className="text-right">

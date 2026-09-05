@@ -3,7 +3,7 @@
  */
 
 import { vi } from "vitest";
-import type { RoleType } from "@prisma/client";
+import type { RoleType } from "../types/types.js";
 import { QuotationState } from "../types/types.js";
 
 export function mockUser(overrides: Partial<any> = {}) {

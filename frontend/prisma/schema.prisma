@@ -14,6 +14,10 @@ datasource db {
 enum UserRole {
   ADMIN
   SALES_REP
+  MANAGER
+  FINANCE
+  EXECUTIVE
+  OPERATIONS
   APPROVER
   CUSTOMER
 }
@@ -27,10 +31,14 @@ enum CustomerTier {
 
 enum QuotationStatus {
   DRAFT
+  PENDING_APPROVAL
   IN_REVIEW
   APPROVED
   REJECTED
+  SENT
+  ACCEPTED
   EXPIRED
+  CANCELLED
 }
 
 enum ApprovalStatus {
@@ -54,6 +62,42 @@ enum WorkflowStepStatus {
   APPROVED
   REJECTED
   SKIPPED
+}
+
+enum RuleOutcome {
+  PASS
+  FAIL
+  WARN
+  SKIP
+}
+
+enum OrderStatus {
+  DRAFT
+  CONFIRMED
+  IN_FULFILLMENT
+  PARTIALLY_FULFILLED
+  FULFILLED
+  CANCELLED
+}
+
+enum ShipmentStatus {
+  PLANNED
+  READY
+  PICKED
+  PACKED
+  SHIPPED
+  IN_TRANSIT
+  DELIVERED
+  CANCELLED
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PAID
+  OVERDUE
+  CANCELLED
+  REFUNDED
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -89,6 +133,7 @@ model User {
 
 model Customer {
   id                String         @id @default(uuid())
+  customerNumber    String?        @unique
   name              String
   externalAccountId String?
   industry          String?
@@ -97,6 +142,9 @@ model Customer {
   creditLimit       Decimal        @default(100000.00) @db.Decimal(14, 2)
   creditAvailable   Decimal        @default(100000.00) @db.Decimal(14, 2)
   territory         String?
+  city              String?
+  state             String?
+  country           String?        @default("India")
   ownerId           String?
   owner             User?          @relation("CustomerOwner", fields: [ownerId], references: [id])
   createdAt         DateTime       @default(now())
@@ -105,9 +153,12 @@ model Customer {
   quotations        Quotation[]
   contacts          Contact[]
   subscriptions     Subscription[]
+  orders            Order[]
+  invoices          Invoice[]
 
   @@index([tier])
   @@index([ownerId])
+  @@index([customerNumber])
 }
 
 model Contact {
@@ -167,6 +218,9 @@ model Product {
   quoteLineItems         QuoteLineItem[]
   recommendationsAsSource ProductRecommendation[] @relation("SourceProduct")
   recommendationsAsTarget ProductRecommendation[] @relation("TargetProduct")
+  orderLines             OrderLine[]
+  reservations           InventoryReservation[]
+  shipmentItems          ShipmentItem[]
 
   @@index([sku])
   @@index([categoryId])
@@ -186,19 +240,27 @@ model Quotation {
   owner           User              @relation("QuotationOwner", fields: [ownerId], references: [id])
   status          QuotationStatus   @default(DRAFT)
   currentStage    String?
-  currency        String            @default("USD")
+  currency        String            @default("INR")
   subtotal        Decimal           @default(0.00) @db.Decimal(14, 2)
   discountTotal   Decimal           @default(0.00) @db.Decimal(14, 2)
   taxTotal        Decimal           @default(0.00) @db.Decimal(14, 2)
   totalValue      Decimal           @default(0.00) @db.Decimal(14, 2)
   estimatedMargin Decimal           @default(0.00) @db.Decimal(5, 2)
   riskScore       Int?
+  notes           String?
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
 
   lineItems       QuoteLineItem[]
   approvals       Approval[]
   subscriptions   Subscription[]
+  ruleEvaluations RuleEvaluation[]
+  decisionTraces  DecisionTrace[]
+  counterfactuals CounterfactualScenario[]
+  orders          Order[]
+  reservations    InventoryReservation[]
+  invoices        Invoice[]
+  negotiations    CustomerNegotiation[]
 
   @@index([customerId])
   @@index([ownerId])
@@ -236,7 +298,7 @@ model PriceList {
   name        String
   code        String          @unique
   description String?
-  currency    String          @default("USD")
+  currency    String          @default("INR")
   tier        CustomerTier?
   isActive    Boolean         @default(true)
   createdAt   DateTime        @default(now())
@@ -312,16 +374,18 @@ model ProductRecommendation {
 // ──────────────────────────────────────────────────────────────────────────────
 
 model Warehouse {
-  id        String          @id @default(uuid())
-  code      String          @unique
-  name      String
-  location  String
-  country   String          @default("USA")
-  isActive  Boolean         @default(true)
-  createdAt DateTime        @default(now())
-  updatedAt DateTime        @updatedAt
+  id           String          @id @default(uuid())
+  code         String          @unique
+  name         String
+  location     String
+  country      String          @default("India")
+  isActive     Boolean         @default(true)
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
 
-  inventory InventoryItem[]
+  inventory    InventoryItem[]
+  reservations InventoryReservation[]
+  shipments    Shipment[]
 
   @@index([code])
 }
@@ -354,7 +418,7 @@ model SubscriptionPlan {
   description  String?
   interval     String         @default("MONTHLY") // MONTHLY, ANNUAL
   billingPrice Decimal        @db.Decimal(14, 2)
-  currency     String         @default("USD")
+  currency     String         @default("INR")
   isActive     Boolean        @default(true)
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
@@ -444,6 +508,272 @@ model ApprovalHistory {
 
   @@index([approvalId])
   @@index([actorId])
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Governance: Rule Engine & Decision Trace
+// ──────────────────────────────────────────────────────────────────────────────
+
+model RuleEvaluation {
+  id           String         @id @default(uuid())
+  quotationId  String
+  quotation    Quotation      @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  ruleId       String
+  ruleName     String
+  outcome      RuleOutcome    @default(PASS)
+  severity     String         @default("INFO")
+  score        Float          @default(0)
+  message      String?
+  metadata     Json?
+  createdAt    DateTime       @default(now())
+
+  decisionTrace DecisionTrace?
+
+  @@index([quotationId])
+  @@index([ruleId])
+}
+
+model DecisionTrace {
+  id            String          @id @default(uuid())
+  quotationId   String
+  quotation     Quotation       @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  evaluationId  String?         @unique
+  evaluation    RuleEvaluation? @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
+  summary       String
+  riskScore     Float
+  approvalLevel String
+  details       Json?
+  createdAt     DateTime        @default(now())
+
+  @@index([quotationId])
+}
+
+model CounterfactualScenario {
+  id           String    @id @default(uuid())
+  quotationId  String
+  quotation    Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  title        String
+  description  String
+  currentValue Float
+  targetValue  Float
+  diffPercent  Float
+  impact       String
+  applied      Boolean   @default(false)
+  metadata     Json?
+  createdAt    DateTime  @default(now())
+
+  @@index([quotationId])
+}
+
+model AuditLog {
+  id         String    @id @default(uuid())
+  entity     String
+  entityId   String
+  action     String
+  actorId    String?
+  actorEmail String?
+  fromState  String?
+  toState    String?
+  metadata   Json?
+  createdAt  DateTime  @default(now())
+
+  @@index([entity, entityId])
+  @@index([actorId])
+  @@index([createdAt])
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Operations: Orders, Reservations & Shipments
+// ──────────────────────────────────────────────────────────────────────────────
+
+model Order {
+  id              String                 @id @default(uuid())
+  orderNumber     String                 @unique
+  quotationId     String?                @unique
+  quotation       Quotation?             @relation(fields: [quotationId], references: [id])
+  customerId      String
+  customer        Customer               @relation(fields: [customerId], references: [id])
+  status          OrderStatus            @default(CONFIRMED)
+  totalAmount     Decimal                @db.Decimal(14, 2)
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+
+  orderLines      OrderLine[]
+  reservations    InventoryReservation[]
+  shipments       Shipment[]
+  invoices        Invoice[]
+
+  @@index([quotationId])
+  @@index([customerId])
+  @@index([status])
+}
+
+model OrderLine {
+  id          String    @id @default(uuid())
+  orderId     String
+  order       Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product   @relation(fields: [productId], references: [id])
+  quantity    Int
+  unitPrice   Decimal   @db.Decimal(14, 2)
+  lineTotal   Decimal   @db.Decimal(14, 2)
+  itemType    String    @default("PHYSICAL") // PHYSICAL, SERVICE, SUBSCRIPTION
+
+  @@index([orderId])
+  @@index([productId])
+}
+
+model InventoryReservation {
+  id             String     @id @default(uuid())
+  orderId        String?
+  order          Order?     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  quotationId    String?
+  quotation      Quotation? @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  warehouseId    String
+  warehouse      Warehouse  @relation(fields: [warehouseId], references: [id])
+  productId      String
+  product        Product    @relation(fields: [productId], references: [id])
+  quantity       Int
+  status         String     @default("CONFIRMED") // CONFIRMED, FULFILLED, RELEASED
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  @@index([orderId])
+  @@index([quotationId])
+  @@index([warehouseId])
+  @@index([productId])
+}
+
+model Shipment {
+  id             String         @id @default(uuid())
+  shipmentNumber String         @unique
+  orderId        String
+  order          Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  warehouseId    String
+  warehouse      Warehouse      @relation(fields: [warehouseId], references: [id])
+  trackingCode   String?
+  carrier        String         @default("Express Logistics")
+  status         ShipmentStatus @default(PLANNED)
+  shippedAt      DateTime?
+  deliveredAt    DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  items          ShipmentItem[]
+
+  @@index([orderId])
+  @@index([warehouseId])
+  @@index([status])
+}
+
+model ShipmentItem {
+  id          String    @id @default(uuid())
+  shipmentId  String
+  shipment    Shipment  @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product   @relation(fields: [productId], references: [id])
+  quantity    Int
+
+  @@index([shipmentId])
+  @@index([productId])
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Operations: Billing, Invoicing & Payments
+// ──────────────────────────────────────────────────────────────────────────────
+
+model Invoice {
+  id            String         @id @default(uuid())
+  invoiceNumber String         @unique
+  orderId       String?
+  order         Order?         @relation(fields: [orderId], references: [id])
+  quotationId   String?
+  quotation     Quotation?     @relation(fields: [quotationId], references: [id])
+  customerId    String
+  customer      Customer       @relation(fields: [customerId], references: [id])
+  status        InvoiceStatus  @default(DRAFT)
+  subtotal      Decimal        @db.Decimal(14, 2)
+  taxAmount     Decimal        @db.Decimal(14, 2)
+  totalAmount   Decimal        @db.Decimal(14, 2)
+  paidAmount    Decimal        @default(0.00) @db.Decimal(14, 2)
+  balanceDue    Decimal        @db.Decimal(14, 2)
+  paymentTerms  String         @default("Net 30 Days")
+  dueDate       DateTime
+  issuedAt      DateTime       @default(now())
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  lines         InvoiceLine[]
+  payments      Payment[]
+  creditNotes   CreditNote[]
+
+  @@index([orderId])
+  @@index([quotationId])
+  @@index([customerId])
+  @@index([status])
+}
+
+model InvoiceLine {
+  id          String    @id @default(uuid())
+  invoiceId   String
+  invoice     Invoice   @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  sku         String
+  description String
+  quantity    Int
+  unitPrice   Decimal   @db.Decimal(14, 2)
+  lineTotal   Decimal   @db.Decimal(14, 2)
+  chargeType  String    @default("ONE_TIME") // ONE_TIME, RECURRING
+  taxRate     Decimal   @default(18.00) @db.Decimal(5, 2)
+
+  @@index([invoiceId])
+}
+
+model Payment {
+  id              String    @id @default(uuid())
+  paymentNumber   String    @unique
+  invoiceId       String
+  invoice         Invoice   @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  amount          Decimal   @db.Decimal(14, 2)
+  paymentMethod   String    @default("BANK_TRANSFER")
+  referenceNumber String?
+  status          String    @default("COMPLETED")
+  paidAt          DateTime  @default(now())
+  createdAt       DateTime  @default(now())
+
+  @@index([invoiceId])
+}
+
+model CreditNote {
+  id               String    @id @default(uuid())
+  creditNoteNumber String    @unique
+  invoiceId        String
+  invoice          Invoice   @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  amount           Decimal   @db.Decimal(14, 2)
+  reason           String
+  issuedAt         DateTime  @default(now())
+  createdAt        DateTime  @default(now())
+
+  @@index([invoiceId])
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Customer Portal & Negotiation
+// ──────────────────────────────────────────────────────────────────────────────
+
+model CustomerNegotiation {
+  id          String     @id @default(uuid())
+  quotationId String
+  quotation   Quotation  @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  authorName  String
+  authorEmail String
+  authorRole  String     // "CUSTOMER" | "INTERNAL"
+  message     String
+  eventType   String     // "COMMENT" | "COUNTER_OFFER" | "ACCEPTANCE" | "REJECTION"
+  changes     Json?
+  createdAt   DateTime   @default(now())
+
+  @@index([quotationId])
+  @@index([createdAt])
 }
 
 // ──────────────────────────────────────────────────────────────────────────────

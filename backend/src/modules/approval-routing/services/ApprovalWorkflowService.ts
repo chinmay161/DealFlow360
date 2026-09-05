@@ -13,11 +13,10 @@
 import type {
   Quotation,
   Approval,
-  RoleType,
   QuotationStatus,
   ApprovalStatus,
 } from "@prisma/client";
-import type { StageDefinition, ApprovalLevelType } from "../types/types.js";
+import type { StageDefinition, ApprovalLevelType, RoleType } from "../types/types.js";
 import {
   ApprovalAlreadyCompletedError,
   DuplicateApprovalError,

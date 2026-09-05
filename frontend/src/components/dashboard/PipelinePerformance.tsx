@@ -17,9 +17,16 @@ const stages: PipelineStage[] = [
   { stage: "Closed Won", value: 324, displayValue: "₹32.4L", count: 4 },
 ];
 
-const maxValue = 420;
+interface PipelinePerformanceProps {
+  initialStages?: PipelineStage[];
+  maxValue?: number;
+}
 
-export const PipelinePerformance: React.FC = () => {
+export const PipelinePerformance: React.FC<PipelinePerformanceProps> = ({
+  initialStages,
+  maxValue = 420,
+}) => {
+  const stageData = initialStages || stages;
   return (
     <div className="bg-white border border-[#E5E7EB] rounded-lg p-space-base shadow-[0px_1px_2px_rgba(15,23,42,0.04)]">
       {/* Header */}
@@ -51,7 +58,7 @@ export const PipelinePerformance: React.FC = () => {
 
       {/* Horizontal Minimalist Bars */}
       <div className="space-y-3.5">
-        {stages.map((s) => {
+        {stageData.map((s) => {
           const percentage = Math.round((s.value / maxValue) * 100);
           const isWon = s.stage === "Closed Won";
 
