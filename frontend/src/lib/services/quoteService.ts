@@ -5,6 +5,7 @@ import { evaluateDiscountGovernance } from "./discountEngine";
 import { evaluateDealRisk, LineRiskInput } from "./riskEngine";
 import { Decimal } from "@prisma/client/runtime/library";
 import { serializeQuoteLineItem, SerializedQuoteLineItem } from "@/lib/quotations";
+import { convertFromINR } from "@/lib/currency";
 
 export async function recalculateQuoteTotalsAndRisk(
   quotationId: string,
@@ -40,7 +41,8 @@ export async function recalculateQuoteTotalsAndRisk(
     const unitPrice = Number(item.unitPrice);
     const discPct = Number(item.discountPercent);
     const taxRate = item.product ? Number(item.product.taxRate) : 18.0;
-    const costPrice = item.product ? Number(item.product.costPrice) : unitPrice * 0.65;
+    const rawCostINR = item.product ? Number(item.product.costPrice) : null;
+    const costPrice = rawCostINR != null ? convertFromINR(rawCostINR, quote.currency) : unitPrice * 0.65;
 
     const lineSubtotal = qty * unitPrice;
     const lineDiscount = lineSubtotal * (discPct / 100);
@@ -84,6 +86,7 @@ export async function recalculateQuoteTotalsAndRisk(
     totalValue,
     estimatedMarginPercent: overallMarginPercent,
     lines: riskLines,
+    currency: quote.currency,
   });
 
   const finalRiskScore = risk.riskScore;
@@ -138,7 +141,7 @@ export async function addLineItemToQuote(params: {
     throw new Error(`Quotation ${quotationId} not found`);
   }
 
-  const pricing = await resolveProductPriceForCustomer(quote.customerId, productId);
+  const pricing = await resolveProductPriceForCustomer(quote.customerId, productId, quote.currency);
   const unitPrice = unitPriceOverride ?? pricing.unitPrice;
 
   const governance = await evaluateDiscountGovernance(
@@ -215,7 +218,10 @@ export async function updateQuoteLineItem(params: {
   const lineSubtotal = newQty * newUnitPrice;
   const lineDiscount = lineSubtotal * (newDiscount / 100);
   const lineTotal = lineSubtotal - lineDiscount;
-  const costPrice = existing.product ? Number(existing.product.costPrice) : newUnitPrice * 0.65;
+  const rawCostINR = existing.product ? Number(existing.product.costPrice) : null;
+  const costPrice = rawCostINR != null
+    ? convertFromINR(rawCostINR, existing.quotation.currency)
+    : newUnitPrice * 0.65;
   const lineCost = newQty * costPrice;
   const marginPct = lineTotal > 0 ? ((lineTotal - lineCost) / lineTotal) * 100 : 0;
 
@@ -296,6 +302,12 @@ export async function switchQuoteCustomer(quotationId: string, newCustomerId: st
     data: { customerId: newCustomerId },
   });
 
+  const quote = await prisma.quotation.findUnique({
+    where: { id: quotationId },
+    select: { currency: true },
+  });
+  const quoteCurrency = quote?.currency || "INR";
+
   // Re-price existing lines for new customer tier
   const lines = await prisma.quoteLineItem.findMany({
     where: { quotationId },
@@ -304,7 +316,7 @@ export async function switchQuoteCustomer(quotationId: string, newCustomerId: st
 
   for (const line of lines) {
     if (line.productId) {
-      const pricing = await resolveProductPriceForCustomer(newCustomerId, line.productId);
+      const pricing = await resolveProductPriceForCustomer(newCustomerId, line.productId, quoteCurrency);
       const gov = await evaluateDiscountGovernance(
         newCustomer.tier,
         line.productId,
@@ -371,7 +383,7 @@ export async function addBundleToQuote(quotationId: string, bundleType: string) 
       const prod = await tx.product.findUnique({ where: { sku: item.sku } });
       if (!prod) continue;
 
-      const pricing = await resolveProductPriceForCustomer(quote.customerId, prod.id);
+      const pricing = await resolveProductPriceForCustomer(quote.customerId, prod.id, quote.currency);
       const governance = await evaluateDiscountGovernance(
         quote.customer.tier,
         prod.id,

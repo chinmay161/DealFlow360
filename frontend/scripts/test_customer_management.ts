@@ -85,7 +85,7 @@ async function main() {
     country: "India",
     contactName: "Rajesh Nair",
     contactEmail: "r.nair@tataadvanced.example",
-    contactPhone: "+91 98200 44551",
+    contactPhone: "+91 9820044551",
     contactTitle: "VP Defence Procurement",
   });
 

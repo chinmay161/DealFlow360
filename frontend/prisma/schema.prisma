@@ -137,6 +137,7 @@ model Customer {
   name              String
   externalAccountId String?
   industry          String?
+  otherIndustryDetails String?
   tier              CustomerTier   @default(BRONZE)
   paymentTerms      String?        @default("Net 30 Days")
   creditLimit       Decimal        @default(100000.00) @db.Decimal(14, 2)

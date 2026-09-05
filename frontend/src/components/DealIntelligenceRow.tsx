@@ -2,7 +2,7 @@
 
 import React from "react";
 import { SerializedQuoteLineItem, SerializedApproval } from "@/lib/quotations";
-import { formatCurrency } from "@/lib/currency";
+import { formatCurrency, getCurrencySymbol } from "@/lib/currency";
 
 interface DealIntelligenceRowProps {
   currency?: string;
@@ -60,7 +60,7 @@ export const DealIntelligenceRow: React.FC<DealIntelligenceRowProps> = ({
                 Financial Summary
               </span>
             </div>
-            <span className="text-[11px] font-label-sm text-outline">{currency} (₹)</span>
+            <span className="text-[11px] font-label-sm text-outline">{currency} ({getCurrencySymbol(currency)})</span>
           </div>
 
           <div className="space-y-2.5 font-body-sm text-body-sm">

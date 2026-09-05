@@ -11,7 +11,7 @@ import {
   quickAddBundleAction,
 } from "@/lib/actions/quoteActions";
 import { getActiveProductsAction } from "@/lib/actions/lookupActions";
-import { formatCurrency } from "@/lib/currency";
+import { formatCurrency, convertFromINR, getCurrencySymbol } from "@/lib/currency";
 
 interface QuoteLineItemsTableProps {
   quotationId?: string;
@@ -251,7 +251,7 @@ export const QuoteLineItemsTable: React.FC<QuoteLineItemsTableProps> = ({
           </div>
           <div className="flex items-center gap-2 text-label-sm text-outline">
             <span>
-              Currency: <strong>{currency} ($)</strong>
+              Currency: <strong>{currency} ({getCurrencySymbol(currency)})</strong>
             </span>
           </div>
         </div>
@@ -625,6 +625,8 @@ export const QuoteLineItemsTable: React.FC<QuoteLineItemsTableProps> = ({
               ) : (
                 filteredProducts.map((p) => {
                   const isSelected = selectedProductId === p.id;
+                  const convertedUnitPrice = convertFromINR(p.unitPrice, currency);
+                  const convertedCostPrice = convertFromINR(p.costPrice, currency);
                   return (
                     <div
                       key={p.id}
@@ -650,10 +652,10 @@ export const QuoteLineItemsTable: React.FC<QuoteLineItemsTableProps> = ({
                       </div>
                       <div className="text-right">
                         <div className="font-code-tabular text-body-md font-bold text-on-surface">
-                          ${p.unitPrice.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                          {formatCurrency(convertedUnitPrice, currency)}
                         </div>
                         <div className="font-body-sm text-[11px] text-outline">
-                          Cost base: ${p.costPrice.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                          Cost base: {formatCurrency(convertedCostPrice, currency)}
                         </div>
                       </div>
                     </div>
@@ -663,59 +665,72 @@ export const QuoteLineItemsTable: React.FC<QuoteLineItemsTableProps> = ({
             </div>
 
             {/* Selected Product Configuration */}
-            {selectedProductId && (
-              <div className="p-4 bg-[#F8FAFC] border-t border-[#E5E7EB] flex items-center justify-between gap-4">
-                <div className="flex items-center gap-4">
-                  <div>
-                    <label className="block text-[11px] font-semibold text-outline uppercase mb-1">
-                      Quantity
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      value={newQuantity}
-                      onChange={(e) => setNewQuantity(Math.max(1, parseInt(e.target.value) || 1))}
-                      className="w-20 px-2 py-1 border border-[#D1D5DB] rounded text-body-sm font-code-tabular"
-                    />
+            {selectedProductId && (() => {
+              const selProd = products.find((p) => p.id === selectedProductId);
+              const selUnitPrice = selProd ? convertFromINR(selProd.unitPrice, currency) : 0;
+              const previewTotal = newQuantity * selUnitPrice * (1 - newDiscount / 100);
+              return (
+                <div className="p-4 bg-[#F8FAFC] border-t border-[#E5E7EB] flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-4">
+                    <div>
+                      <label className="block text-[11px] font-semibold text-outline uppercase mb-1">
+                        Quantity
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={newQuantity}
+                        onChange={(e) => setNewQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                        className="w-20 px-2 py-1 border border-[#D1D5DB] rounded text-body-sm font-code-tabular"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-semibold text-outline uppercase mb-1">
+                        Discount %
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.5"
+                        value={newDiscount}
+                        onChange={(e) => setNewDiscount(Math.max(0, Math.min(100, parseFloat(e.target.value) || 0)))}
+                        className="w-20 px-2 py-1 border border-[#D1D5DB] rounded text-body-sm font-code-tabular"
+                      />
+                    </div>
+                    <div className="hidden sm:block">
+                      <label className="block text-[11px] font-semibold text-outline uppercase mb-1">
+                        Preview Total ({currency})
+                      </label>
+                      <div className="h-[30px] flex items-center font-code-tabular text-xs font-bold text-primary">
+                        {formatCurrency(previewTotal, currency)}
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-[11px] font-semibold text-outline uppercase mb-1">
-                      Discount %
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      max="100"
-                      step="0.5"
-                      value={newDiscount}
-                      onChange={(e) => setNewDiscount(Math.max(0, Math.min(100, parseFloat(e.target.value) || 0)))}
-                      className="w-20 px-2 py-1 border border-[#D1D5DB] rounded text-body-sm font-code-tabular"
-                    />
-                  </div>
-                </div>
 
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setIsProductModalOpen(false)}
-                    className="h-9 px-4 rounded-md border border-[#D1D5DB] bg-white text-on-surface font-label-md text-label-md font-semibold hover:bg-surface-bright"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    disabled={isSubmitting}
-                    onClick={handleAddProduct}
-                    className="h-9 px-5 rounded-md bg-primary hover:bg-[#1E3A8A] text-white font-label-md text-label-md font-semibold flex items-center gap-1.5 shadow-sm disabled:opacity-50"
-                  >
-                    <span className="material-symbols-outlined text-sm" data-icon="add">
-                      add
-                    </span>
-                    <span>Add to Quotation</span>
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsProductModalOpen(false)}
+                      className="h-9 px-4 rounded-md border border-[#D1D5DB] bg-white text-on-surface font-label-md text-label-md font-semibold hover:bg-surface-bright"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isSubmitting}
+                      onClick={handleAddProduct}
+                      className="h-9 px-5 rounded-md bg-primary hover:bg-[#1E3A8A] text-white font-label-md text-label-md font-semibold flex items-center gap-1.5 shadow-sm disabled:opacity-50"
+                    >
+                      <span className="material-symbols-outlined text-sm" data-icon="add">
+                        add
+                      </span>
+                      <span>Add to Quotation</span>
+                    </button>
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
           </div>
         </div>
       )}

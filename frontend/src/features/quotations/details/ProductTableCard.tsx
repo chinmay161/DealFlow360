@@ -9,12 +9,14 @@ import { Package, Save } from "lucide-react";
 import type { QuoteLineItem } from "@/types/quotation.types";
 import { quotationService } from "@/services/quotation.service";
 import { useToast } from "@/components/providers/ToastProvider";
+import { getCurrencySymbol } from "@/lib/currency";
 
 interface ProductTableCardProps {
   quotationId: string;
   lineItems: QuoteLineItem[];
   isDraft: boolean;
   onRefresh: () => void;
+  currency?: string;
 }
 
 export function ProductTableCard({
@@ -22,6 +24,7 @@ export function ProductTableCard({
   lineItems,
   isDraft,
   onRefresh,
+  currency = "INR",
 }: ProductTableCardProps) {
   const toast = useToast();
   const [items, setItems] = useState<QuoteLineItem[]>(lineItems);
@@ -93,10 +96,10 @@ export function ProductTableCard({
             <tr>
               <th className="p-3.5 text-left">Product Title & SKU</th>
               <th className="p-3.5 text-right w-24">Qty</th>
-              <th className="p-3.5 text-right w-32">Unit Price (₹)</th>
+              <th className="p-3.5 text-right w-32">Unit Price ({getCurrencySymbol(currency)})</th>
               <th className="p-3.5 text-right w-28">Discount (%)</th>
               <th className="p-3.5 text-right w-24">Margin (%)</th>
-              <th className="p-3.5 text-right w-32">Total (₹)</th>
+              <th className="p-3.5 text-right w-32">Total ({getCurrencySymbol(currency)})</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">

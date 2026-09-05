@@ -5,6 +5,8 @@ import { Trash2, Copy, Plus, AlertTriangle, PackagePlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
+import { getCurrencySymbol } from "@/lib/currency";
+
 export interface LineItemDraft {
   id: string;
   productId?: string;
@@ -18,6 +20,7 @@ export interface LineItemDraft {
 
 interface LineItemsEditorProps {
   lineItems: LineItemDraft[];
+  currency?: string;
   customerTierLimit?: number;
   onUpdateLineItem: (index: number, updates: Partial<LineItemDraft>) => void;
   onRemoveLineItem: (index: number) => void;
@@ -29,6 +32,7 @@ interface LineItemsEditorProps {
 
 export function LineItemsEditor({
   lineItems,
+  currency = "INR",
   customerTierLimit = 15,
   onUpdateLineItem,
   onRemoveLineItem,
@@ -93,10 +97,10 @@ export function LineItemsEditor({
               <tr>
                 <th className="p-3 text-left min-w-[180px]">Product / SKU</th>
                 <th className="p-3 text-right w-24">Qty</th>
-                <th className="p-3 text-right w-32">Unit Price (₹)</th>
+                <th className="p-3 text-right w-32">Unit Price ({getCurrencySymbol(currency)})</th>
                 <th className="p-3 text-right w-28">Discount (%)</th>
                 <th className="p-3 text-right w-20">Tax (%)</th>
-                <th className="p-3 text-right w-32">Total (₹)</th>
+                <th className="p-3 text-right w-32">Total ({getCurrencySymbol(currency)})</th>
                 <th className="p-3 text-center w-24">Actions</th>
               </tr>
             </thead>

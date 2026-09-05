@@ -1,4 +1,4 @@
-import { formatIndianNumber } from "@/lib/currency";
+import { formatCurrency, convertToINR } from "@/lib/currency";
 
 export interface DealRiskAssessment {
   riskScore: number;
@@ -21,8 +21,9 @@ export function evaluateDealRisk(params: {
   totalValue: number;
   estimatedMarginPercent: number;
   lines: LineRiskInput[];
+  currency?: string;
 }): DealRiskAssessment {
-  const { subtotal, totalValue, estimatedMarginPercent, lines } = params;
+  const { subtotal, totalValue, estimatedMarginPercent, lines, currency = "INR" } = params;
   let score = 15; // baseline commercial risk
   const reasons: string[] = [];
 
@@ -58,13 +59,14 @@ export function evaluateDealRisk(params: {
     reasons.push(`High aggregate package discount (${blendedDiscount.toFixed(1)}%)`);
   }
 
-  // 4. Deal magnitude
-  if (totalValue >= 10000000) {
+  // 4. Deal magnitude (convert to INR benchmark for equivalent ₹50L / ₹1Cr thresholds)
+  const totalValueINR = convertToINR(totalValue, currency);
+  if (totalValueINR >= 10000000) {
     score += 15;
-    reasons.push(`High-value enterprise contract (₹${formatIndianNumber(totalValue)})`);
-  } else if (totalValue >= 5000000) {
+    reasons.push(`High-value enterprise contract (${formatCurrency(totalValue, currency)})`);
+  } else if (totalValueINR >= 5000000) {
     score += 10;
-    reasons.push(`Significant commercial commitment (₹${formatIndianNumber(totalValue)})`);
+    reasons.push(`Significant commercial commitment (${formatCurrency(totalValue, currency)})`);
   }
 
   // Bound score between 5 and 95
