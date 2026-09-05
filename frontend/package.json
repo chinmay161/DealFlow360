@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",
+    "@prisma/client": "^7.10.0",
     "@tanstack/react-query": "^5.102.8",
     "@tanstack/react-table": "^9.2.4",
     "clsx": "^2.1.1",
@@ -20,10 +21,12 @@
     "react-hook-form": "^7.87.0",
     "recharts": "^3.10.1",
     "tailwind-merge": "^3.6.0",
-    "zod": "^3.25.76"
+    "zod": "^3.24.2"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
+    "@prisma/client": "^6.4.1",
+    "prisma": "^6.4.1",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",

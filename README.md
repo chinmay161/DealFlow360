@@ -1,19 +1,28 @@
 # DealFlow360
 
-DealFlow360 scaffold with separated `frontend` (Next.js 15, Tailwind CSS, TypeScript, TanStack Query, React Hook Form, Zod, Recharts) and `backend` (Node.js, Express, TypeScript, Prisma ORM) alongside Dockerized PostgreSQL 16.
+Fullstack application built with Next.js 15 (App Router, TypeScript, Tailwind CSS, TanStack Query, React Hook Form, Zod, Recharts), Prisma ORM, and Dockerized PostgreSQL 16.
 
-## Structure
+Frontend and Backend APIs run together seamlessly on **the same port (`3000`)**.
+
+## Project Architecture
 
 ```
 DealFlow360/
-├── docker-compose.yml     # PostgreSQL 16 service
+├── docker-compose.yml     # PostgreSQL 16 container
 ├── .env.example           # Root environment configuration
-├── backend/               # Express + TypeScript + Prisma ORM
+├── frontend/              # Fullstack Next.js 15 app (Frontend & Backend on port 3000)
 │   ├── prisma/            # Prisma schema (PostgreSQL)
-│   ├── src/               # Application logic
+│   ├── src/
+│   │   ├── app/           # App Router (pages & /api backend routes)
+│   │   │   ├── api/
+│   │   │   │   └── health/route.ts
+│   │   │   ├── layout.tsx
+│   │   │   └── page.tsx
+│   │   └── lib/           # Prisma client singleton & shared utilities
 │   └── package.json
-└── frontend/              # Next.js 15 App Router + Tailwind CSS
-    ├── src/               # Next.js app & components
+└── backend/               # Standalone Express + TypeScript service (alternative)
+    ├── prisma/
+    ├── src/
     └── package.json
 ```
 
@@ -27,23 +36,21 @@ docker compose up -d
 
 PostgreSQL will be running on `localhost:5432` with database `dealflow360`.
 
-### 2. Backend Setup
-
-```bash
-cd backend
-npm install
-npx prisma generate
-npm run dev
-```
-
-Server runs at `http://localhost:5000` (Health check: `http://localhost:5000/health`).
-
-### 3. Frontend Setup
+### 2. Run Application (Same Port: 3000)
 
 ```bash
 cd frontend
-npm install
 npm run dev
 ```
 
-App runs at `http://localhost:3000`.
+- **Web UI**: [http://localhost:3000](http://localhost:3000)
+- **Backend API**: [http://localhost:3000/api/health](http://localhost:3000/api/health)
+
+### 3. Database Migrations (Prisma)
+
+From the `frontend` folder:
+
+```bash
+npx prisma generate
+npx prisma db push # or npx prisma migrate dev
+```
