@@ -121,9 +121,11 @@ export const authConfig: NextAuthConfig = {
       const isLoggedIn = !!auth?.user;
       const { pathname } = nextUrl;
 
-      // Allow authentication API routes and health check
+      // Allow authentication API routes, health check, and proxied backend APIs
       const isPublicApi =
-        pathname.startsWith("/api/auth") || pathname.startsWith("/api/health");
+        pathname.startsWith("/api/auth") ||
+        pathname.startsWith("/api/health") ||
+        pathname.startsWith("/api/v1");
       if (isPublicApi) {
         return true;
       }
