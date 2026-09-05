@@ -11,6 +11,8 @@ import { QuoteActionBar } from "@/components/QuoteActionBar";
 import { CounterfactualCard } from "@/components/quotations/CounterfactualCard";
 import { DecisionTraceModal } from "@/components/quotations/DecisionTraceModal";
 
+import { formatCurrency } from "@/lib/currency";
+
 interface QuotationDetailViewProps {
   quotation: SerializedQuotationDetail;
 }
@@ -18,19 +20,36 @@ interface QuotationDetailViewProps {
 export const QuotationDetailView: React.FC<QuotationDetailViewProps> = ({ quotation }) => {
   const [isDecisionTraceOpen, setIsDecisionTraceOpen] = useState(false);
 
+  const customerTier = quotation.customer.tier
+    ? `${quotation.customer.tier.charAt(0).toUpperCase()}${quotation.customer.tier.slice(1).toLowerCase()} Tier`
+    : "Commercial Tier";
+
+  const priceList = quotation.customer.tier
+    ? `${quotation.customer.tier.toUpperCase()} Commercial Rate Card (${quotation.currency})`
+    : `Standard Commercial Price List (${quotation.currency})`;
+
+  const primaryContact =
+    quotation.customer.contacts?.find((c) => c.isPrimary) ||
+    quotation.customer.contacts?.[0] ||
+    null;
+
+  const creditLine = quotation.customer.creditLimit
+    ? `Credit Limit: ${formatCurrency(quotation.customer.creditLimit, quotation.currency)} Active`
+    : "Credit Line: Commercial Account";
+
+  const territory = quotation.customer.territory
+    ? `Territory: ${quotation.customer.territory}`
+    : "Territory: PAN-India Enterprise";
+
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-background">
       {/* SCROLLABLE WORKSPACE */}
       <div className="flex-1 overflow-y-auto px-space-xl py-space-lg space-y-space-base pb-32">
         <WorkspaceHeader
           quotationNumber={quotation.quotationNumber}
-          customerTier={
-            quotation.customer.industry?.includes("Enterprise")
-              ? "Gold Tier"
-              : "Standard Tier"
-          }
-          priceList="Gold Preferred India 2026"
-          revisionText="Revision History (v3)"
+          customerTier={customerTier}
+          priceList={priceList}
+          revisionText="Active Commercial Version"
         />
 
         <CustomerSummary
@@ -38,17 +57,17 @@ export const QuotationDetailView: React.FC<QuotationDetailViewProps> = ({ quotat
           customer={quotation.customer}
           owner={quotation.owner}
           buyerContact={
-            quotation.customer.name === "Apex Infotech Pvt. Ltd."
+            primaryContact
               ? {
-                  name: "Ananya Shah",
-                  title: "VP Procurement",
-                  email: "ananya.shah@apexinfotech.example",
+                  name: primaryContact.name,
+                  title: primaryContact.title || "Commercial Contact",
+                  email: primaryContact.email,
                 }
               : null
           }
-          paymentTerms="Net 45 Days"
-          creditLine="Credit Line: ₹25,00,000.00 Active"
-          territory="Territory: South India (Bengaluru)"
+          paymentTerms={quotation.customer.paymentTerms || "Net 30 Days"}
+          creditLine={creditLine}
+          territory={territory}
         />
 
         <QuoteLineItemsTable

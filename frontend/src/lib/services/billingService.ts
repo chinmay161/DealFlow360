@@ -194,9 +194,21 @@ export async function getLiveInvoicesData() {
     { label: "DUE THIS WEEK", value: `${dueThisWeekCount}`, icon: "event_upcoming" },
   ];
 
+  const lineItems = dbInvoices.flatMap((inv) =>
+    inv.lines.map((l) => ({
+      invoiceId: inv.invoiceNumber,
+      description: l.description,
+      quantity: `${l.quantity} units`,
+      unitPrice: Number(l.unitPrice),
+      billing: "Standard",
+      amount: Number(l.lineTotal),
+    }))
+  );
+
   return {
     invoices,
     invoiceStats,
+    lineItems,
   };
 }
 

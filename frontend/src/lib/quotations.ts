@@ -123,6 +123,15 @@ export interface SerializedApproval {
   workflowSteps: SerializedWorkflowStep[];
 }
 
+export interface SerializedCustomerContact {
+  id: string;
+  name: string;
+  email: string;
+  title?: string | null;
+  phone?: string | null;
+  isPrimary: boolean;
+}
+
 export interface SerializedCustomer {
   id: string;
   customerNumber: string | null;
@@ -132,6 +141,11 @@ export interface SerializedCustomer {
   city?: string | null;
   state?: string | null;
   tier?: string | null;
+  paymentTerms?: string | null;
+  creditLimit?: number | null;
+  creditAvailable?: number | null;
+  territory?: string | null;
+  contacts?: SerializedCustomerContact[];
 }
 
 export interface SerializedOwner {
@@ -254,7 +268,9 @@ export async function getQuotationByNumber(
     const q = await prisma.quotation.findUnique({
       where: { quotationNumber },
       include: {
-        customer: true,
+        customer: {
+          include: { contacts: true },
+        },
         owner: true,
         lineItems: {
           include: { product: true },
@@ -289,6 +305,18 @@ export async function getQuotationByNumber(
         city: q.customer.city,
         state: q.customer.state,
         tier: q.customer.tier,
+        paymentTerms: q.customer.paymentTerms,
+        creditLimit: q.customer.creditLimit ? Number(q.customer.creditLimit) : null,
+        creditAvailable: q.customer.creditAvailable ? Number(q.customer.creditAvailable) : null,
+        territory: q.customer.territory,
+        contacts: q.customer.contacts?.map((c) => ({
+          id: c.id,
+          name: c.name,
+          email: c.email,
+          title: c.title,
+          phone: c.phone,
+          isPrimary: c.isPrimary,
+        })),
       },
       ownerId: q.ownerId,
       owner: {
@@ -372,7 +400,9 @@ export async function getQuotationWithLineItems(
       const q = await prisma.quotation.findUnique({
         where: { id: identifier },
         include: {
-          customer: true,
+          customer: {
+            include: { contacts: true },
+          },
           owner: true,
           lineItems: {
             include: { product: true },
@@ -409,6 +439,18 @@ export async function getQuotationWithLineItems(
           city: q.customer.city,
           state: q.customer.state,
           tier: q.customer.tier,
+          paymentTerms: q.customer.paymentTerms,
+          creditLimit: q.customer.creditLimit ? Number(q.customer.creditLimit) : null,
+          creditAvailable: q.customer.creditAvailable ? Number(q.customer.creditAvailable) : null,
+          territory: q.customer.territory,
+          contacts: q.customer.contacts?.map((c) => ({
+            id: c.id,
+            name: c.name,
+            email: c.email,
+            title: c.title,
+            phone: c.phone,
+            isPrimary: c.isPrimary,
+          })),
         },
         ownerId: q.ownerId,
         owner: {

@@ -16,6 +16,11 @@ export interface SanitizedCustomerQuote {
   paymentTerms: string;
   createdAt: string;
   validUntil: string;
+  primaryContact?: {
+    name: string;
+    title?: string | null;
+    email: string;
+  } | null;
   lineItems: Array<{
     id: string;
     productName: string;
@@ -34,16 +39,37 @@ export interface SanitizedCustomerQuote {
   }>;
 }
 
-export async function getCustomerQuotations(customerName = "Apex Infotech Pvt. Ltd.") {
-  const searchKeyword = customerName.split(" ")[0] || "Apex";
-  const customer = await prisma.customer.findFirst({
-    where: { name: { contains: searchKeyword } },
-  });
+export async function getCustomerQuotations(customerIdentifier?: string) {
+  let customer = null;
+  if (customerIdentifier) {
+    const searchKeyword = customerIdentifier.split(" ")[0] || customerIdentifier;
+    customer = await prisma.customer.findFirst({
+      where: {
+        OR: [
+          { name: { contains: searchKeyword, mode: "insensitive" } },
+          { customerNumber: customerIdentifier },
+          { id: customerIdentifier },
+        ],
+      },
+      include: { contacts: true },
+    });
+  }
+
+  if (!customer) {
+    customer =
+      (await prisma.customer.findFirst({
+        where: { quotations: { some: {} } },
+        include: { contacts: true },
+      })) ||
+      (await prisma.customer.findFirst({
+        include: { contacts: true },
+      }));
+  }
 
   const quotes = await prisma.quotation.findMany({
     where: customer ? { customerId: customer.id } : {},
     include: {
-      customer: true,
+      customer: { include: { contacts: true } },
       lineItems: { include: { product: true } },
       negotiations: { orderBy: { createdAt: "desc" } },
     },
@@ -59,7 +85,7 @@ export async function getCustomerQuotationDetail(identifier: string) {
       OR: [{ quotationNumber: identifier }, { id: identifier }],
     },
     include: {
-      customer: true,
+      customer: { include: { contacts: true } },
       lineItems: { include: { product: true } },
       negotiations: { orderBy: { createdAt: "desc" } },
     },
@@ -73,20 +99,32 @@ function sanitizeQuotationForCustomer(quote: any): SanitizedCustomerQuote {
   // 30 days validity
   const validUntilDate = new Date(quote.createdAt.getTime() + 30 * 24 * 60 * 60 * 1000);
 
+  const primaryContact =
+    quote.customer.contacts?.find((c: any) => c.isPrimary) ||
+    quote.customer.contacts?.[0] ||
+    null;
+
   return {
     id: quote.id,
     quotationNumber: quote.quotationNumber,
     customerName: quote.customer.name,
-    customerCode: quote.customer.customerCode || "CUST-00001",
+    customerCode: quote.customer.customerNumber || quote.customer.externalAccountId || "CUST-00001",
     status: quote.status,
     currency: quote.currency || "INR",
     subtotal: Number(quote.subtotal),
     discountTotal: Number(quote.discountTotal),
     taxTotal: Number(quote.taxTotal),
     totalValue: Number(quote.totalValue),
-    paymentTerms: "Net 30 Days from delivery",
+    paymentTerms: quote.customer.paymentTerms || "Net 30 Days from delivery",
     createdAt: quote.createdAt.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }),
     validUntil: validUntilDate.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }),
+    primaryContact: primaryContact
+      ? {
+          name: primaryContact.name,
+          title: primaryContact.title || "Commercial Contact",
+          email: primaryContact.email,
+        }
+      : null,
     lineItems: quote.lineItems.map((li: any) => ({
       id: li.id,
       productName: li.productName,

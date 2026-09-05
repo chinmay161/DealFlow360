@@ -48,45 +48,15 @@ export const DecisionTraceModal: React.FC<DecisionTraceModalProps> = ({
       .then((res) => (res.ok ? res.json() : null))
       .then((trace) => {
         if (!isMounted) return;
-        if (trace) {
+        if (trace && Array.isArray(trace.rules)) {
           setData(trace);
         } else {
-          // Fallback mock trace data
           setData({
             quotationId,
             quotationNumber,
-            overallRiskScore: 72,
-            status: "IN_REVIEW",
-            rules: [
-              {
-                ruleName: "Discount Ceiling Rule",
-                outcome: "FAIL",
-                computedValue: 22,
-                threshold: 15,
-                explanation: "Line item HW-LP14 requested 22% discount exceeds tier policy threshold of 15%",
-              },
-              {
-                ruleName: "Minimum Margin Threshold Rule",
-                outcome: "WARN",
-                computedValue: 31.8,
-                threshold: 35,
-                explanation: "Estimated gross margin 31.8% is compressed below the commercial target of 35.0%",
-              },
-              {
-                ruleName: "Customer Tier Governance Rule",
-                outcome: "PASS",
-                computedValue: 10,
-                threshold: 30,
-                explanation: "Customer tier Gold: eligible for enterprise commercial concession route",
-              },
-              {
-                ruleName: "Blended Commercial Risk Rule",
-                outcome: "FAIL",
-                computedValue: 72,
-                threshold: 50,
-                explanation: "Aggregate risk index calculated at 72/100 requiring Level 2 Commercial Finance sign-off",
-              },
-            ],
+            overallRiskScore: 0,
+            status: "PENDING_EVALUATION",
+            rules: [],
           });
         }
       })
@@ -95,38 +65,9 @@ export const DecisionTraceModal: React.FC<DecisionTraceModalProps> = ({
           setData({
             quotationId,
             quotationNumber,
-            overallRiskScore: 72,
-            status: "IN_REVIEW",
-            rules: [
-              {
-                ruleName: "Discount Ceiling Rule",
-                outcome: "FAIL",
-                computedValue: 22,
-                threshold: 15,
-                explanation: "Line item HW-LP14 requested 22% discount exceeds tier policy threshold of 15%",
-              },
-              {
-                ruleName: "Minimum Margin Threshold Rule",
-                outcome: "WARN",
-                computedValue: 31.8,
-                threshold: 35,
-                explanation: "Estimated gross margin 31.8% is compressed below the commercial target of 35.0%",
-              },
-              {
-                ruleName: "Customer Tier Governance Rule",
-                outcome: "PASS",
-                computedValue: 10,
-                threshold: 30,
-                explanation: "Customer tier Gold: eligible for enterprise commercial concession route",
-              },
-              {
-                ruleName: "Blended Commercial Risk Rule",
-                outcome: "FAIL",
-                computedValue: 72,
-                threshold: 50,
-                explanation: "Aggregate risk index calculated at 72/100 requiring Level 2 Commercial Finance sign-off",
-              },
-            ],
+            overallRiskScore: 0,
+            status: "PENDING_EVALUATION",
+            rules: [],
           });
         }
       })
@@ -238,63 +179,77 @@ export const DecisionTraceModal: React.FC<DecisionTraceModalProps> = ({
 
               {/* Rules List */}
               <div className="space-y-3">
-                {data?.rules.map((rule, idx) => {
-                  const isFail = rule.outcome === "FAIL";
-                  const isWarn = rule.outcome === "WARN";
+                {!data?.rules || data.rules.length === 0 ? (
+                  <div className="py-12 text-center text-outline bg-slate-50/50 rounded-xl border border-dashed border-[#E5E7EB]">
+                    <span className="material-symbols-outlined text-4xl opacity-40 mb-2 block" data-icon="policy">
+                      policy
+                    </span>
+                    <p className="text-body-md font-semibold text-on-surface">
+                      No Automated Decision Trace Recorded Yet
+                    </p>
+                    <p className="text-body-sm text-outline mt-1 max-w-md mx-auto">
+                      Automated rule traces are logged when quotations undergo commercial validation, margin safety checks, or approval workflows.
+                    </p>
+                  </div>
+                ) : (
+                  data.rules.map((rule, idx) => {
+                    const isFail = rule.outcome === "FAIL";
+                    const isWarn = rule.outcome === "WARN";
 
-                  return (
-                    <div
-                      key={idx}
-                      className={`p-4 rounded-lg border transition-all ${
-                        isFail
-                          ? "bg-[#FFF5F5] border-[#FECDD3]"
-                          : isWarn
-                          ? "bg-[#FFFDF5] border-[#FDE68A]"
-                          : "bg-white border-[#E5E7EB]"
-                      }`}
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex items-start gap-2.5">
-                          <span
-                            className={`material-symbols-outlined text-base mt-0.5 ${
-                              isFail ? "text-[#E11D48]" : isWarn ? "text-[#D97706]" : "text-[#10B981]"
-                            }`}
-                            data-icon={isFail ? "cancel" : isWarn ? "warning" : "check_circle"}
-                          >
-                            {isFail ? "cancel" : isWarn ? "warning" : "check_circle"}
-                          </span>
-                          <div>
-                            <h4 className="font-title-md text-xs font-bold text-on-surface">
-                              {rule.ruleName}
-                            </h4>
-                            <p className="text-body-sm text-[11px] text-on-surface-variant mt-1">
-                              {rule.explanation}
-                            </p>
+                    return (
+                      <div
+                        key={idx}
+                        className={`p-4 rounded-lg border transition-all ${
+                          isFail
+                            ? "bg-[#FFF5F5] border-[#FECDD3]"
+                            : isWarn
+                            ? "bg-[#FFFDF5] border-[#FDE68A]"
+                            : "bg-white border-[#E5E7EB]"
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-start gap-2.5">
+                            <span
+                              className={`material-symbols-outlined text-base mt-0.5 ${
+                                isFail ? "text-[#E11D48]" : isWarn ? "text-[#D97706]" : "text-[#10B981]"
+                              }`}
+                              data-icon={isFail ? "cancel" : isWarn ? "warning" : "check_circle"}
+                            >
+                              {isFail ? "cancel" : isWarn ? "warning" : "check_circle"}
+                            </span>
+                            <div>
+                              <h4 className="font-title-md text-xs font-bold text-on-surface">
+                                {rule.ruleName}
+                              </h4>
+                              <p className="text-body-sm text-[11px] text-on-surface-variant mt-1">
+                                {rule.explanation}
+                              </p>
+                            </div>
                           </div>
+
+                          <span
+                            className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase shrink-0 ${
+                              isFail
+                                ? "bg-[#FFF1F2] text-[#9F1239] border border-[#FECDD3]"
+                                : isWarn
+                                ? "bg-[#FFFBEB] text-[#92400E] border border-[#FDE68A]"
+                                : "bg-[#ECFDF5] text-[#065F46] border border-[#A7F3D0]"
+                            }`}
+                          >
+                            {rule.outcome}
+                          </span>
                         </div>
 
-                        <span
-                          className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase shrink-0 ${
-                            isFail
-                              ? "bg-[#FFF1F2] text-[#9F1239] border border-[#FECDD3]"
-                              : isWarn
-                              ? "bg-[#FFFBEB] text-[#92400E] border border-[#FDE68A]"
-                              : "bg-[#ECFDF5] text-[#065F46] border border-[#A7F3D0]"
-                          }`}
-                        >
-                          {rule.outcome}
-                        </span>
+                        {(rule.computedValue !== undefined || rule.threshold !== undefined) && (
+                          <div className="mt-2.5 pt-2 border-t border-black/5 flex items-center justify-between text-[10px] text-outline font-code-tabular">
+                            <span>Computed: <strong>{rule.computedValue}%</strong></span>
+                            <span>Policy Threshold: <strong>{rule.threshold}%</strong></span>
+                          </div>
+                        )}
                       </div>
-
-                      {(rule.computedValue !== undefined || rule.threshold !== undefined) && (
-                        <div className="mt-2.5 pt-2 border-t border-black/5 flex items-center justify-between text-[10px] text-outline font-code-tabular">
-                          <span>Computed: <strong>{rule.computedValue}%</strong></span>
-                          <span>Policy Threshold: <strong>{rule.threshold}%</strong></span>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+                    );
+                  })
+                )}
               </div>
             </>
           ) : (
@@ -307,15 +262,35 @@ export const DecisionTraceModal: React.FC<DecisionTraceModalProps> = ({
         {/* Modal Footer */}
         <div className="px-6 py-3 border-t border-[#E5E7EB] bg-slate-50 flex items-center justify-between">
           <span className="text-[11px] text-outline">
-            Audit logs stored with cryptographic hash in PostgreSQL
+            Governance decision traces stored in PostgreSQL ledger
           </span>
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-1.5 rounded-lg bg-white border border-[#D1D5DB] text-on-surface hover:bg-slate-100 font-label-md text-xs font-semibold shadow-sm"
-          >
-            Close Trace
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `decision-trace-${quotationNumber || "quote"}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+              }}
+              className="px-3 py-1.5 rounded-lg bg-white border border-[#D1D5DB] text-on-surface hover:bg-slate-100 font-label-md text-xs font-semibold shadow-sm flex items-center gap-1.5 transition-colors"
+            >
+              <span className="material-symbols-outlined text-sm" data-icon="download">
+                download
+              </span>
+              <span>Export JSON</span>
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-1.5 rounded-lg bg-primary text-white hover:bg-primary-hover font-label-md text-xs font-semibold shadow-sm transition-colors"
+            >
+              Close Trace
+            </button>
+          </div>
         </div>
       </div>
     </div>

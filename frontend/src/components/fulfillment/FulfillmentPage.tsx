@@ -20,14 +20,18 @@ interface FulfillmentPageProps {
 }
 
 const money = (value: number) => formatCurrency(value, "INR", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-const productName = (productId: string) => defaultItems.find((item) => item.id === productId)?.name ?? productId;
-const productSku = (productId: string) => defaultItems.find((item) => item.id === productId)?.sku ?? "";
 
 const card = "bg-white border border-[#E5E7EB] rounded-lg shadow-[0px_1px_2px_rgba(15,23,42,0.04)]";
 const successBadge = "inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-label-sm font-semibold bg-[#ECFDF5] text-[#065F46] border border-[#A7F3D0]";
 const infoBadge = "inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-label-sm font-semibold bg-[#EFF6FF] text-[#1E40AF] border border-[#BFDBFE]";
 const warningBadge = "inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-label-sm font-semibold bg-[#FFFBEB] text-[#92400E] border border-[#FDE68A]";
 const secondaryButton = "h-8 px-3 rounded-md bg-white border border-[#D1D5DB] text-on-surface font-label-md text-label-md font-semibold hover:bg-surface-bright flex items-center gap-1.5 transition-colors shadow-sm";
+
+const productName = (productId: string, items: any[] = defaultItems) =>
+  items.find((item) => item.id === productId)?.name ?? productId;
+
+const productSku = (productId: string, items: any[] = defaultItems) =>
+  items.find((item) => item.id === productId)?.sku ?? "";
 
 export function FulfillmentPage({ initialData }: FulfillmentPageProps) {
   const fulfillmentOrder = initialData?.fulfillmentOrder || defaultOrder;
