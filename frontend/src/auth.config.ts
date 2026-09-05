@@ -94,9 +94,19 @@ export const authConfig: NextAuthConfig = {
       const isLoginPage = pathname === "/login";
       if (isLoginPage) {
         if (isLoggedIn) {
+          if ((auth?.user as any)?.role === "CUSTOMER") {
+            return Response.redirect(new URL("/customer/dashboard", nextUrl));
+          }
           return Response.redirect(new URL("/dashboard", nextUrl));
         }
         return true;
+      }
+
+      // If customer logs in or attempts to access salesman dashboard or root, redirect to customer dashboard
+      if (isLoggedIn && (auth?.user as any)?.role === "CUSTOMER") {
+        if (pathname === "/dashboard" || pathname === "/") {
+          return Response.redirect(new URL("/customer/dashboard", nextUrl));
+        }
       }
 
       // Protected routes: Quotations (/ and /quotations), Dashboard (/dashboard), Approvals (/approvals), etc.

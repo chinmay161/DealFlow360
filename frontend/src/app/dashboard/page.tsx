@@ -9,6 +9,8 @@ import { DealHealthPanel } from "@/components/dashboard/DealHealthPanel";
 import { PipelinePerformance } from "@/components/dashboard/PipelinePerformance";
 import { RecentActivityFeed } from "@/components/dashboard/RecentActivityFeed";
 import { getDashboardMetrics } from "@/lib/services/dashboardService";
+import { auth } from "@/auth";
+import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +20,11 @@ export const metadata: Metadata = {
 };
 
 export default async function DashboardPage() {
+  const session = await auth();
+  if ((session?.user as any)?.role === "CUSTOMER") {
+    redirect("/customer/dashboard");
+  }
+
   let metrics = null;
   try {
     metrics = await getDashboardMetrics();

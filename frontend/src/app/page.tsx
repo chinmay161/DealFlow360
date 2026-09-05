@@ -4,6 +4,8 @@ import { AppSidebar } from "@/components/AppSidebar";
 import { TopHeader } from "@/components/TopHeader";
 import { QuotationDetailView } from "@/components/quotations/QuotationDetailView";
 import { getQuotationByNumber } from "@/lib/quotations";
+import { auth } from "@/auth";
+import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +15,11 @@ export const metadata: Metadata = {
 };
 
 export default async function QuotationBuilderPage() {
+  const session = await auth();
+  if ((session?.user as any)?.role === "CUSTOMER") {
+    redirect("/customer/dashboard");
+  }
+
   let quotation = null;
   let errorMessage: string | null = null;
 
