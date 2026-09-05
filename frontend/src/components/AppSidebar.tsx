@@ -79,7 +79,6 @@ export const AppSidebar: React.FC = () => {
   const isReports = pathname === "/reports" || pathname.startsWith("/reports/");
   const isConfiguration = pathname === "/configuration" || pathname.startsWith("/configuration");
   const isAudit = pathname === "/audit" || pathname.startsWith("/audit");
-  const isPortal = pathname === "/portal" || pathname.startsWith("/portal/");
 
   const isQuotations =
     !isApprovals &&
@@ -115,19 +114,6 @@ export const AppSidebar: React.FC = () => {
             </span>
           </div>
         </Link>
-
-        {/* Quick CTA Button */}
-        <div className="p-space-base pb-space-xs">
-          <Link
-            href="/quotations/new"
-            className="w-full flex items-center justify-center gap-space-xs px-space-md py-[7px] rounded-lg bg-primary hover:bg-[#1E3A8A] text-on-primary font-label-md text-label-md font-semibold transition-colors duration-150 shadow-sm"
-          >
-            <span className="material-symbols-outlined" data-icon="add_circle">
-              add_circle
-            </span>
-            <span>Create Quotation</span>
-          </Link>
-        </div>
 
         {/* Nav Section: Core */}
         <div className="px-space-sm mt-space-sm">
@@ -357,28 +343,6 @@ export const AppSidebar: React.FC = () => {
           </Link>
         </div>
 
-        {/* Nav Section: External Portal */}
-        <div className="px-space-sm mt-space-md mb-space-base">
-          <div className="px-space-sm py-1 font-label-sm text-[10px] uppercase font-bold text-outline tracking-wider">
-            Buyer Workspace
-          </div>
-          <Link
-            href="/portal"
-            className={`flex items-center gap-space-sm px-space-md py-[6px] rounded-lg transition-colors duration-150 ${
-              isPortal
-                ? "bg-surface-container-low text-primary font-title-md text-body-md font-semibold"
-                : "text-on-surface-variant font-body-md text-body-md hover:bg-surface-container-low"
-            }`}
-          >
-            <span
-              className={`material-symbols-outlined ${isPortal ? "text-primary" : "text-outline"}`}
-              data-icon="storefront"
-            >
-              storefront
-            </span>
-            <span>Customer Portal</span>
-          </Link>
-        </div>
       </div>
 
       {/* Bottom User Operator Profile */}

@@ -96,7 +96,7 @@ export const authConfig: NextAuthConfig = {
         if (isLoggedIn) {
           const userRole = (auth?.user as any)?.role;
           if (userRole === "CUSTOMER") {
-            return Response.redirect(new URL("/customer/dashboard", nextUrl));
+            return Response.redirect(new URL("/portal", nextUrl));
           }
           if (userRole === "MANAGER") {
             return Response.redirect(new URL("/manager/dashboard", nextUrl));
@@ -106,11 +106,24 @@ export const authConfig: NextAuthConfig = {
         return true;
       }
 
-      // If customer logs in or attempts to access salesman dashboard, overview or root, redirect to customer dashboard
+      // Customer Portal entry route (/portal) is publicly accessible for unauthenticated users (shows login gate)
+      if (pathname === "/portal" && !isLoggedIn) {
+        return true;
+      }
+
+      // If customer logs in or attempts to access internal sales dashboard, overview, or root, redirect to customer portal
       if (isLoggedIn && (auth?.user as any)?.role === "CUSTOMER") {
-        if (pathname === "/dashboard" || pathname === "/overview" || pathname === "/") {
-          return Response.redirect(new URL("/customer/dashboard", nextUrl));
+        if (pathname === "/dashboard" || pathname === "/overview" || pathname === "/" || pathname.startsWith("/customer")) {
+          return Response.redirect(new URL("/portal", nextUrl));
         }
+      }
+
+      // Protect /portal subroutes (e.g. /portal/quotations) from unauthorized users
+      if (pathname.startsWith("/portal/quotations")) {
+        if (!isLoggedIn || (auth?.user as any)?.role !== "CUSTOMER") {
+          return Response.redirect(new URL("/portal", nextUrl));
+        }
+        return true;
       }
 
       // If manager accesses root, redirect to manager dashboard

@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { submitForApprovalAction } from "@/lib/actions/quoteActions";
 import { SerializedQuotationDetail } from "@/lib/quotations";
-import { formatCurrency } from "@/lib/currency";
+import { formatCurrency, getCurrencySymbol } from "@/lib/currency";
 
 interface QuoteActionBarProps {
   quotation?: SerializedQuotationDetail;
@@ -222,7 +222,7 @@ export const QuoteActionBar: React.FC<QuoteActionBarProps> = ({
                   <div className="text-xs text-outline space-y-1">
                     <div>Payment Terms: <strong className="text-on-surface">Net 45 Days</strong></div>
                     <div>Account Owner: <strong className="text-on-surface">{quotation?.owner.name || "Arjun Mehta"}</strong></div>
-                    <div>Currency: <strong className="text-on-surface">{currency} (₹)</strong></div>
+                    <div>Currency: <strong className="text-on-surface">{currency} ({getCurrencySymbol(currency)})</strong></div>
                   </div>
                 </div>
               </div>

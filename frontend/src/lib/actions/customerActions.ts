@@ -5,6 +5,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { CreateCustomerSchema } from "@/lib/validations/customer";
 import { getCurrentUser } from "@/lib/auth";
+import { normalizeEmail, normalizePhone, findExistingContactByEmail } from "@/lib/services/portalAuthService";
 
 function safeRevalidate() {
   try {
@@ -72,6 +73,18 @@ export async function createCustomerAction(input: unknown) {
     const parsed = CreateCustomerSchema.parse(input);
     const owner = await resolveAuthenticatedOwner();
 
+    const normalizedEmail = normalizeEmail(parsed.contactEmail);
+    const normalizedPhone = normalizePhone(parsed.contactPhone);
+
+    // Prevent duplicate portal contact identities
+    const existingContact = await findExistingContactByEmail(normalizedEmail);
+    if (existingContact) {
+      return {
+        success: false,
+        error: `A contact with email '${parsed.contactEmail}' is already registered with account '${existingContact.customer.name}'. Duplicate portal identities are not permitted.`,
+      };
+    }
+
     // Ensure customerNumber is unique or generate next
     let finalCustomerNumber = parsed.customerNumber;
     const existing = await prisma.customer.findUnique({
@@ -90,7 +103,8 @@ export async function createCustomerAction(input: unknown) {
           customerNumber: finalCustomerNumber,
           name: parsed.name,
           externalAccountId: finalExternalId,
-          industry: parsed.industry,
+          industry: parsed.industry === "Others" && parsed.otherIndustryDetails ? `Others - ${parsed.otherIndustryDetails}` : parsed.industry,
+          otherIndustryDetails: parsed.otherIndustryDetails || null,
           tier: parsed.tier,
           paymentTerms: parsed.paymentTerms,
           creditLimit: parsed.creditLimit,
@@ -107,11 +121,29 @@ export async function createCustomerAction(input: unknown) {
         data: {
           customerId: customer.id,
           name: parsed.contactName,
-          email: parsed.contactEmail,
-          phone: parsed.contactPhone || null,
+          email: normalizedEmail,
+          phone: normalizedPhone,
           title: parsed.contactTitle || "Primary Contact",
           isPrimary: true,
-          portalAccess: false,
+          portalAccess: parsed.portalAccessEnabled ?? true,
+          portalAccessEnabled: parsed.portalAccessEnabled ?? true,
+          isActive: true,
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          entity: "Customer",
+          entityId: customer.id,
+          action: "CUSTOMER_REGISTRATION",
+          actorId: owner.id,
+          actorEmail: owner.email,
+          metadata: {
+            customerNumber: customer.customerNumber,
+            customerName: customer.name,
+            contactEmail: normalizedEmail,
+            portalAccessEnabled: parsed.portalAccessEnabled ?? true,
+          },
         },
       });
 

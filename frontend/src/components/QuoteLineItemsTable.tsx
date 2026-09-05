@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { SerializedQuoteLineItem } from "@/lib/quotations";
 import {
@@ -11,7 +12,7 @@ import {
   quickAddBundleAction,
 } from "@/lib/actions/quoteActions";
 import { getActiveProductsAction } from "@/lib/actions/lookupActions";
-import { formatCurrency } from "@/lib/currency";
+import { formatCurrency, convertFromINR, getCurrencySymbol } from "@/lib/currency";
 import {
   StockIndicator,
   LowStockBanner,
@@ -86,11 +87,31 @@ export const QuoteLineItemsTable: React.FC<QuoteLineItemsTableProps> = ({
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [isBundleModalOpen, setIsBundleModalOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<SerializedQuoteLineItem | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        if (isProductModalOpen) setIsProductModalOpen(false);
+        if (isBundleModalOpen) setIsBundleModalOpen(false);
+        if (itemToDelete) setItemToDelete(null);
+      }
+    };
+    if (isProductModalOpen || isBundleModalOpen || itemToDelete) {
+      window.addEventListener("keydown", handleKeyDown);
+    }
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isProductModalOpen, isBundleModalOpen, itemToDelete]);
 
   // Product picker state
   const [products, setProducts] = useState<ProductOption[]>([]);
   const [productSearch, setProductSearch] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("ALL");
   const [isLoadingProducts, setIsLoadingProducts] = useState(false);
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const [newQuantity, setNewQuantity] = useState(1);
@@ -258,14 +279,13 @@ export const QuoteLineItemsTable: React.FC<QuoteLineItemsTableProps> = ({
     }
   };
 
-  const categories = Array.from(new Set(products.map((p) => p.categoryName)));
-
   const filteredProducts = products.filter((p) => {
-    const matchesSearch =
-      p.name.toLowerCase().includes(productSearch.toLowerCase()) ||
-      p.sku.toLowerCase().includes(productSearch.toLowerCase());
-    const matchesCat = selectedCategory === "ALL" || p.categoryName === selectedCategory;
-    return matchesSearch && matchesCat;
+    const searchLower = productSearch.toLowerCase().trim();
+    if (!searchLower) return true;
+    return (
+      p.name.toLowerCase().includes(searchLower) ||
+      p.sku.toLowerCase().includes(searchLower)
+    );
   });
 
   return (
@@ -283,7 +303,7 @@ export const QuoteLineItemsTable: React.FC<QuoteLineItemsTableProps> = ({
           </div>
           <div className="flex items-center gap-2 text-label-sm text-outline">
             <span>
-              Currency: <strong>{currency} ($)</strong>
+              Currency: <strong>{currency} ({getCurrencySymbol(currency)})</strong>
             </span>
           </div>
         </div>
@@ -661,9 +681,17 @@ export const QuoteLineItemsTable: React.FC<QuoteLineItemsTableProps> = ({
       </div>
 
       {/* Add Product Dialog */}
-      {isProductModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <div className="bg-white border border-[#E5E7EB] rounded-lg shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[85vh]">
+      {mounted && isProductModalOpen && createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          {/* Full-viewport Backdrop: covers entire viewport (header, sidebar, and page) uniformly */}
+          <div
+            className="fixed inset-0 bg-black/40 backdrop-blur-sm transition-opacity"
+            onClick={() => setIsProductModalOpen(false)}
+            aria-hidden="true"
+          />
+
+          {/* Modal Content - stays above backdrop, fully sharp */}
+          <div className="relative z-10 bg-white border border-[#E5E7EB] rounded-lg shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[85vh]">
             <div className="px-5 py-4 border-b border-[#E5E7EB] flex items-center justify-between bg-[#F8F9FA]">
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-primary text-xl" data-icon="inventory_2">
@@ -674,6 +702,7 @@ export const QuoteLineItemsTable: React.FC<QuoteLineItemsTableProps> = ({
                 </h3>
               </div>
               <button
+                type="button"
                 onClick={() => setIsProductModalOpen(false)}
                 className="text-outline hover:text-on-surface p-1 rounded-md"
               >
@@ -683,8 +712,8 @@ export const QuoteLineItemsTable: React.FC<QuoteLineItemsTableProps> = ({
               </button>
             </div>
 
-            {/* Filter & Search */}
-            <div className="p-4 border-b border-[#E5E7EB] space-y-3">
+            {/* Search */}
+            <div className="p-4 border-b border-[#E5E7EB]">
               <div className="relative">
                 <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-sm" data-icon="search">
                   search
@@ -697,35 +726,6 @@ export const QuoteLineItemsTable: React.FC<QuoteLineItemsTableProps> = ({
                   className="w-full pl-9 pr-4 py-2 border border-[#D1D5DB] rounded-md text-body-sm text-on-surface focus:outline-none focus:ring-1 focus:ring-primary"
                   autoFocus
                 />
-              </div>
-
-              {/* Category tabs */}
-              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
-                <button
-                  type="button"
-                  onClick={() => setSelectedCategory("ALL")}
-                  className={`px-2.5 py-1 rounded-full font-medium transition-colors ${
-                    selectedCategory === "ALL"
-                      ? "bg-primary text-white"
-                      : "bg-[#F1F5F9] text-on-surface hover:bg-[#E2E8F0]"
-                  }`}
-                >
-                  All Categories
-                </button>
-                {categories.map((cat) => (
-                  <button
-                    key={cat}
-                    type="button"
-                    onClick={() => setSelectedCategory(cat)}
-                    className={`px-2.5 py-1 rounded-full font-medium whitespace-nowrap transition-colors ${
-                      selectedCategory === cat
-                        ? "bg-primary text-white"
-                        : "bg-[#F1F5F9] text-on-surface hover:bg-[#E2E8F0]"
-                    }`}
-                  >
-                    {cat}
-                  </button>
-                ))}
               </div>
             </div>
 
@@ -742,6 +742,8 @@ export const QuoteLineItemsTable: React.FC<QuoteLineItemsTableProps> = ({
               ) : (
                 filteredProducts.map((p) => {
                   const isSelected = selectedProductId === p.id;
+                  const convertedUnitPrice = convertFromINR(p.unitPrice, currency);
+                  const convertedCostPrice = convertFromINR(p.costPrice, currency);
                   return (
                     <div
                       key={p.id}
@@ -767,10 +769,10 @@ export const QuoteLineItemsTable: React.FC<QuoteLineItemsTableProps> = ({
                       </div>
                       <div className="text-right">
                         <div className="font-code-tabular text-body-md font-bold text-on-surface">
-                          ${p.unitPrice.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                          {formatCurrency(convertedUnitPrice, currency)}
                         </div>
                         <div className="font-body-sm text-[11px] text-outline">
-                          Cost base: ${p.costPrice.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                          Cost base: {formatCurrency(convertedCostPrice, currency)}
                         </div>
                       </div>
                     </div>
@@ -780,103 +782,117 @@ export const QuoteLineItemsTable: React.FC<QuoteLineItemsTableProps> = ({
             </div>
 
             {/* Selected Product Configuration & Real-Time Inventory Visibility */}
-            {selectedProductId && (
-              <div className="border-t border-[#E5E7EB] bg-[#F8FAFC] p-4 space-y-3">
-                {/* Pre-submission inventory preview */}
-                {(() => {
-                  const sp = products.find((p) => p.id === selectedProductId);
-                  const totalAvail = sp?.totalStock || 50;
-                  const resCount = 10;
-                  const free = Math.max(0, totalAvail - resCount);
-                  const isShort = newQuantity > free;
+            {selectedProductId && (() => {
+              const sp = products.find((p) => p.id === selectedProductId);
+              const totalAvail = sp?.totalStock || 50;
+              const resCount = 10;
+              const free = Math.max(0, totalAvail - resCount);
+              const isShort = newQuantity > free;
+              const selUnitPrice = sp ? convertFromINR(sp.unitPrice, currency) : 0;
+              const previewTotal = newQuantity * selUnitPrice * (1 - newDiscount / 100);
 
-                  return (
-                    <div className="space-y-2">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        <ReservationPreview
-                          warehouseName="Mumbai Central Hub"
-                          willReserve={newQuantity}
-                          currentAvailable={totalAvail}
-                          currentReserved={resCount}
-                        />
-                        <ShipmentReadiness
-                          isReady={!isShort}
-                          estimatedDispatch={!isShort ? "Today" : "3-5 Business Days (Replenishment)"}
-                          reason={isShort ? `Requested ${newQuantity} units exceeds current free stock (${free} units).` : undefined}
+              return (
+                <div className="border-t border-[#E5E7EB] bg-[#F8FAFC] p-4 space-y-3">
+                  {/* Pre-submission inventory preview */}
+                  <div className="space-y-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <ReservationPreview
+                        warehouseName="Mumbai Central Hub"
+                        willReserve={newQuantity}
+                        currentAvailable={totalAvail}
+                        currentReserved={resCount}
+                      />
+                      <ShipmentReadiness
+                        isReady={!isShort}
+                        estimatedDispatch={!isShort ? "Today" : "3-5 Business Days (Replenishment)"}
+                        reason={isShort ? `Requested ${newQuantity} units exceeds current free stock (${free} units).` : undefined}
+                      />
+                    </div>
+                    {isShort && (
+                      <LowStockBanner
+                        requestedQuantity={newQuantity}
+                        availableQuantity={totalAvail}
+                        freeStock={free}
+                      />
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between gap-4 pt-1">
+                    <div className="flex items-center gap-4">
+                      <div>
+                        <label className="block text-[11px] font-semibold text-outline uppercase mb-1">
+                          Quantity
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          value={newQuantity}
+                          onChange={(e) => setNewQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                          className="w-20 px-2 py-1 border border-[#D1D5DB] rounded text-body-sm font-code-tabular"
                         />
                       </div>
-                      {isShort && (
-                        <LowStockBanner
-                          requestedQuantity={newQuantity}
-                          availableQuantity={totalAvail}
-                          freeStock={free}
+                      <div>
+                        <label className="block text-[11px] font-semibold text-outline uppercase mb-1">
+                          Discount %
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          step="0.5"
+                          value={newDiscount}
+                          onChange={(e) => setNewDiscount(Math.max(0, Math.min(100, parseFloat(e.target.value) || 0)))}
+                          className="w-20 px-2 py-1 border border-[#D1D5DB] rounded text-body-sm font-code-tabular"
                         />
-                      )}
+                      </div>
+                      <div className="hidden sm:block">
+                        <label className="block text-[11px] font-semibold text-outline uppercase mb-1">
+                          Preview Total ({currency})
+                        </label>
+                        <div className="h-[30px] flex items-center font-code-tabular text-xs font-bold text-primary">
+                          {formatCurrency(previewTotal, currency)}
+                        </div>
+                      </div>
                     </div>
-                  );
-                })()}
 
-                <div className="flex items-center justify-between gap-4 pt-1">
-                  <div className="flex items-center gap-4">
-                    <div>
-                      <label className="block text-[11px] font-semibold text-outline uppercase mb-1">
-                        Quantity
-                      </label>
-                      <input
-                        type="number"
-                        min="1"
-                        value={newQuantity}
-                        onChange={(e) => setNewQuantity(Math.max(1, parseInt(e.target.value) || 1))}
-                        className="w-20 px-2 py-1 border border-[#D1D5DB] rounded text-body-sm font-code-tabular"
-                      />
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setIsProductModalOpen(false)}
+                        className="h-9 px-4 rounded-md border border-[#D1D5DB] bg-white text-on-surface font-label-md text-label-md font-semibold hover:bg-surface-bright"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isSubmitting}
+                        onClick={handleAddProduct}
+                        className="h-9 px-5 rounded-md bg-primary hover:bg-[#1E3A8A] text-white font-label-md text-label-md font-semibold flex items-center gap-1.5 shadow-sm disabled:opacity-50"
+                      >
+                        <span className="material-symbols-outlined text-sm" data-icon="add">
+                          add
+                        </span>
+                        <span>Add to Quotation</span>
+                      </button>
                     </div>
-                    <div>
-                      <label className="block text-[11px] font-semibold text-outline uppercase mb-1">
-                        Discount %
-                      </label>
-                      <input
-                        type="number"
-                        min="0"
-                        max="100"
-                        step="0.5"
-                        value={newDiscount}
-                        onChange={(e) => setNewDiscount(Math.max(0, Math.min(100, parseFloat(e.target.value) || 0)))}
-                        className="w-20 px-2 py-1 border border-[#D1D5DB] rounded text-body-sm font-code-tabular"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setIsProductModalOpen(false)}
-                      className="h-9 px-4 rounded-md border border-[#D1D5DB] bg-white text-on-surface font-label-md text-label-md font-semibold hover:bg-surface-bright"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="button"
-                      disabled={isSubmitting}
-                      onClick={handleAddProduct}
-                      className="h-9 px-5 rounded-md bg-primary hover:bg-[#1E3A8A] text-white font-label-md text-label-md font-semibold flex items-center gap-1.5 shadow-sm disabled:opacity-50"
-                    >
-                      <span className="material-symbols-outlined text-sm" data-icon="add">
-                        add
-                      </span>
-                      <span>Add to Quotation</span>
-                    </button>
                   </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Quick Add Bundle Dialog */}
-      {isBundleModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <div className="bg-white border border-[#E5E7EB] rounded-lg shadow-xl w-full max-w-xl overflow-hidden flex flex-col">
+      {mounted && isBundleModalOpen && createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="fixed inset-0 bg-black/40 backdrop-blur-sm transition-opacity"
+            onClick={() => setIsBundleModalOpen(false)}
+            aria-hidden="true"
+          />
+          <div className="relative z-10 bg-white border border-[#E5E7EB] rounded-lg shadow-xl w-full max-w-xl overflow-hidden flex flex-col">
             <div className="px-5 py-4 border-b border-[#E5E7EB] flex items-center justify-between bg-[#F8F9FA]">
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-primary text-xl" data-icon="library_add">
@@ -887,6 +903,7 @@ export const QuoteLineItemsTable: React.FC<QuoteLineItemsTableProps> = ({
                 </h3>
               </div>
               <button
+                type="button"
                 onClick={() => setIsBundleModalOpen(false)}
                 className="text-outline hover:text-on-surface p-1 rounded-md"
               >
@@ -968,13 +985,19 @@ export const QuoteLineItemsTable: React.FC<QuoteLineItemsTableProps> = ({
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Delete Confirmation Modal */}
-      {itemToDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <div className="bg-white border border-[#E5E7EB] rounded-lg shadow-xl w-full max-w-md overflow-hidden">
+      {mounted && itemToDelete && createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="fixed inset-0 bg-black/40 backdrop-blur-sm transition-opacity"
+            onClick={() => setItemToDelete(null)}
+            aria-hidden="true"
+          />
+          <div className="relative z-10 bg-white border border-[#E5E7EB] rounded-lg shadow-xl w-full max-w-md overflow-hidden">
             <div className="p-5">
               <div className="flex items-center gap-3 text-[#E11D48] mb-3">
                 <span className="material-symbols-outlined text-2xl" data-icon="delete_forever">
@@ -1005,7 +1028,8 @@ export const QuoteLineItemsTable: React.FC<QuoteLineItemsTableProps> = ({
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );

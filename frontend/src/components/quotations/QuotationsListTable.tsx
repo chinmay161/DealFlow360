@@ -201,15 +201,7 @@ export const QuotationsListTable: React.FC<QuotationsListTableProps> = ({
             </span>
           </button>
 
-          <Link
-            href="/quotations/new"
-            className="h-8 px-3 rounded-md bg-primary hover:bg-[#1E3A8A] text-white font-label-md text-xs font-semibold flex items-center gap-1 shadow-sm transition-colors"
-          >
-            <span className="material-symbols-outlined text-sm" data-icon="add">
-              add
-            </span>
-            <span>New Quote</span>
-          </Link>
+
         </div>
       </div>
 
@@ -421,17 +413,7 @@ export const QuotationsListTable: React.FC<QuotationsListTableProps> = ({
         <span>
           Showing <strong>{filtered.length}</strong> of <strong>{quotations.length}</strong> total quotations
         </span>
-        <div className="flex items-center gap-2">
-          <Link
-            href="/quotations/new"
-            className="text-xs text-primary font-semibold hover:underline flex items-center gap-1"
-          >
-            <span className="material-symbols-outlined text-xs" data-icon="add_circle">
-              add_circle
-            </span>
-            <span>Create New Quotation</span>
-          </Link>
-        </div>
+
       </div>
     </div>
   );

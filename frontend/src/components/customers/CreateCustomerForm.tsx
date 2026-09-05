@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createCustomerAction } from "@/lib/actions/customerActions";
+import { ALL_INDIAN_STATES, getCitiesForState } from "@/lib/data/indiaLocations";
 
 interface CreateCustomerFormProps {
   initialCustomerNumber: string;
@@ -19,6 +20,7 @@ const COMMON_INDUSTRIES = [
   "Healthcare & Life Sciences",
   "Consumer & Retail Tech",
   "Government & Defence Technologies",
+  "Others",
 ];
 
 const COMMON_TIERS = [
@@ -37,32 +39,56 @@ export const CreateCustomerForm: React.FC<CreateCustomerFormProps> = ({
   const [customerNumber] = useState(initialCustomerNumber);
   const [name, setName] = useState("");
   const [industry, setIndustry] = useState("Enterprise Cloud & Infrastructure");
+  const [otherIndustryDetails, setOtherIndustryDetails] = useState("");
   const [tier, setTier] = useState<"BRONZE" | "SILVER" | "GOLD" | "PLATINUM">("BRONZE");
   const [paymentTerms, setPaymentTerms] = useState("Net 30 Days");
   const [creditLimit, setCreditLimit] = useState("1000000");
-  const [city, setCity] = useState("Bengaluru");
   const [state, setState] = useState("Karnataka");
+  const [city, setCity] = useState("Bengaluru");
   const [country] = useState("India");
 
   // Primary Contact
   const [contactName, setContactName] = useState("");
   const [contactEmail, setContactEmail] = useState("");
-  const [contactPhone, setContactPhone] = useState("+91 ");
+  const [phoneDigits, setPhoneDigits] = useState("");
   const [contactTitle, setContactTitle] = useState("Head of Procurement");
+  const [portalAccessEnabled, setPortalAccessEnabled] = useState(true);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSubmitting(true);
     setErrorMsg(null);
+
+    // Validate "Others" industry specification
+    if (industry === "Others" && !otherIndustryDetails.trim()) {
+      setErrorMsg("Please specify the industry sector details for 'Others'.");
+      return;
+    }
+
+    // Validate business email format: must contain '@' and a valid '.domain'
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (!emailRegex.test(contactEmail.trim())) {
+      setErrorMsg("Business email must follow a standard format with '@' and a valid domain name (e.g. name@company.com).");
+      return;
+    }
+
+    // Validate mobile number: mandatory, numerical only, exactly 10 digits
+    const cleanDigits = phoneDigits.replace(/\D/g, "");
+    if (cleanDigits.length !== 10) {
+      setErrorMsg("Mobile phone number is mandatory and must be exactly 10 numerical digits.");
+      return;
+    }
+
+    setIsSubmitting(true);
 
     try {
       const res = await createCustomerAction({
         customerNumber,
         name: name.trim(),
         industry: industry.trim(),
+        otherIndustryDetails: industry === "Others" ? otherIndustryDetails.trim() : null,
         tier,
         paymentTerms,
         creditLimit: Number(creditLimit) || 1000000,
@@ -71,8 +97,9 @@ export const CreateCustomerForm: React.FC<CreateCustomerFormProps> = ({
         country,
         contactName: contactName.trim(),
         contactEmail: contactEmail.trim(),
-        contactPhone: contactPhone.trim() || null,
+        contactPhone: `+91 ${cleanDigits}`,
         contactTitle: contactTitle.trim() || null,
+        portalAccessEnabled,
       });
 
       if (res.success && res.customer) {
@@ -189,7 +216,7 @@ export const CreateCustomerForm: React.FC<CreateCustomerFormProps> = ({
             </h2>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
+              <div className="sm:col-span-2">
                 <label className="block text-xs font-semibold text-on-surface mb-1.5">
                   Industry Sector <span className="text-error">*</span>
                 </label>
@@ -204,6 +231,26 @@ export const CreateCustomerForm: React.FC<CreateCustomerFormProps> = ({
                     </option>
                   ))}
                 </select>
+
+                {/* Conditional "Others" manual specification text box */}
+                {industry === "Others" && (
+                  <div className="mt-3">
+                    <label className="block text-xs font-semibold text-on-surface mb-1.5">
+                      Specify Industry Sector Details <span className="text-error">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={otherIndustryDetails}
+                      onChange={(e) => setOtherIndustryDetails(e.target.value)}
+                      placeholder="e.g. Space-Tech Avionics, Green Hydrogen Systems, AI Semiconductor Hardware..."
+                      className="w-full h-10 px-3 rounded-md bg-white border border-[#D1D5DB] text-on-surface text-xs focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
+                    />
+                    <p className="text-[11px] text-outline mt-1">
+                      Provide specific industry specialization to register custom sector classification.
+                    </p>
+                  </div>
+                )}
               </div>
 
               <div>
@@ -257,30 +304,49 @@ export const CreateCustomerForm: React.FC<CreateCustomerFormProps> = ({
 
               <div>
                 <label className="block text-xs font-semibold text-on-surface mb-1.5">
-                  City <span className="text-error">*</span>
+                  State / Union Territory <span className="text-error">*</span>
                 </label>
-                <input
-                  type="text"
+                <select
                   required
-                  value={city}
-                  onChange={(e) => setCity(e.target.value)}
-                  placeholder="e.g. Hyderabad"
+                  value={state}
+                  onChange={(e) => {
+                    const newState = e.target.value;
+                    setState(newState);
+                    const cities = getCitiesForState(newState);
+                    setCity(cities[0] || "");
+                  }}
                   className="w-full h-10 px-3 rounded-md bg-white border border-[#D1D5DB] text-on-surface text-xs focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
-                />
+                >
+                  {ALL_INDIAN_STATES.map((st) => (
+                    <option key={st} value={st}>
+                      {st}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[11px] text-outline mt-1">
+                  Select from 28 Indian States &amp; 8 UTs.
+                </p>
               </div>
 
               <div>
                 <label className="block text-xs font-semibold text-on-surface mb-1.5">
-                  State <span className="text-error">*</span>
+                  City (Commercial Hub) <span className="text-error">*</span>
                 </label>
-                <input
-                  type="text"
+                <select
                   required
-                  value={state}
-                  onChange={(e) => setState(e.target.value)}
-                  placeholder="e.g. Telangana"
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
                   className="w-full h-10 px-3 rounded-md bg-white border border-[#D1D5DB] text-on-surface text-xs focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
-                />
+                >
+                  {getCitiesForState(state).map((ct) => (
+                    <option key={ct} value={ct}>
+                      {ct}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[11px] text-outline mt-1">
+                  Designated commercial &amp; industrial hubs for {state}.
+                </p>
               </div>
             </div>
           </div>
@@ -316,24 +382,41 @@ export const CreateCustomerForm: React.FC<CreateCustomerFormProps> = ({
                 <input
                   type="email"
                   required
+                  pattern="[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"
                   value={contactEmail}
                   onChange={(e) => setContactEmail(e.target.value)}
-                  placeholder="e.g. rajesh.nair@company.example"
+                  placeholder="e.g. rajesh.nair@company.com"
                   className="w-full h-10 px-3 rounded-md bg-white border border-[#D1D5DB] text-on-surface text-xs focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
                 />
+                <p className="text-[11px] text-outline mt-1">
+                  Must include &apos;@&apos; and domain name (e.g. .com, .in).
+                </p>
               </div>
 
               <div>
                 <label className="block text-xs font-semibold text-on-surface mb-1.5">
                   Mobile / Phone Number
                 </label>
-                <input
-                  type="tel"
-                  value={contactPhone}
-                  onChange={(e) => setContactPhone(e.target.value)}
-                  placeholder="+91 98XXX XXXXX"
-                  className="w-full h-10 px-3 rounded-md bg-white border border-[#D1D5DB] text-on-surface text-xs focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary font-mono"
-                />
+                <div className="flex rounded-md shadow-sm">
+                  <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-[#D1D5DB] bg-slate-100 text-on-surface text-xs font-mono font-bold select-none text-slate-700">
+                    +91
+                  </span>
+                  <input
+                    type="tel"
+                    inputMode="numeric"
+                    maxLength={10}
+                    value={phoneDigits}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/\D/g, "").slice(0, 10);
+                      setPhoneDigits(val);
+                    }}
+                    placeholder="9876543210"
+                    className="w-full h-10 px-3 rounded-r-md bg-white border border-[#D1D5DB] text-on-surface text-xs focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary font-mono tracking-wider"
+                  />
+                </div>
+                <p className="text-[11px] text-outline mt-1">
+                  Fixed +91 prefix. Strictly 10 numerical digits.
+                </p>
               </div>
 
               <div>
@@ -347,6 +430,23 @@ export const CreateCustomerForm: React.FC<CreateCustomerFormProps> = ({
                   placeholder="e.g. VP Procurement"
                   className="w-full h-10 px-3 rounded-md bg-white border border-[#D1D5DB] text-on-surface text-xs focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
                 />
+              </div>
+
+              <div className="md:col-span-2 pt-2 border-t border-[#F1F5F9]">
+                <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={portalAccessEnabled}
+                    onChange={(e) => setPortalAccessEnabled(e.target.checked)}
+                    className="w-4 h-4 rounded text-primary focus:ring-primary border-slate-300"
+                  />
+                  <span className="text-xs font-semibold text-on-surface">
+                    Enable DealFlow360 Customer Portal Access for this Primary Contact
+                  </span>
+                </label>
+                <p className="text-[11px] text-outline mt-1 pl-6">
+                  When enabled, this customer contact will be eligible to authenticate through the customer login gate and review quotations.
+                </p>
               </div>
             </div>
           </div>

@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { formatCurrency } from "@/lib/currency";
+import { toggleContactPortalAccessAction } from "@/lib/actions/portalAuthActions";
 
 export interface CustomerRow {
   id: string;
@@ -20,9 +21,12 @@ export interface CustomerRow {
   activeStatus: boolean;
   quotationCount: number;
   primaryContact?: {
+    id?: string;
     name: string;
     title?: string | null;
     email: string;
+    portalAccess?: boolean;
+    isActive?: boolean;
   } | null;
 }
 
@@ -30,9 +34,38 @@ interface CustomerDirectoryTableProps {
   customers: CustomerRow[];
 }
 
-export const CustomerDirectoryTable: React.FC<CustomerDirectoryTableProps> = ({ customers }) => {
+export const CustomerDirectoryTable: React.FC<CustomerDirectoryTableProps> = ({ customers: initialCustomers }) => {
+  const [customers, setCustomers] = useState(initialCustomers);
   const [searchTerm, setSearchTerm] = useState("");
   const [tierFilter, setTierFilter] = useState("ALL");
+  const [togglingId, setTogglingId] = useState<string | null>(null);
+
+  const handleTogglePortal = async (contactId: string, newStatus: boolean) => {
+    setTogglingId(contactId);
+    try {
+      const res = await toggleContactPortalAccessAction(contactId, newStatus);
+      if (res.success) {
+        setCustomers((prev) =>
+          prev.map((c) => {
+            if (c.primaryContact?.id === contactId) {
+              return {
+                ...c,
+                primaryContact: {
+                  ...c.primaryContact,
+                  portalAccess: newStatus,
+                },
+              };
+            }
+            return c;
+          })
+        );
+      }
+    } catch (err) {
+      console.error("Failed to toggle portal access:", err);
+    } finally {
+      setTogglingId(null);
+    }
+  };
 
   const filtered = customers.filter((c) => {
     const matchesSearch =
@@ -136,9 +169,40 @@ export const CustomerDirectoryTable: React.FC<CustomerDirectoryTableProps> = ({ 
                     </td>
                     <td className="py-3 px-4">
                       {c.primaryContact ? (
-                        <div>
+                        <div className="space-y-1">
                           <div className="font-semibold text-on-surface">{c.primaryContact.name}</div>
-                          <div className="text-[11px] text-outline">{c.primaryContact.email}</div>
+                          <div className="text-[11px] text-outline font-mono">{c.primaryContact.email}</div>
+                          <div className="flex items-center gap-1.5 pt-0.5">
+                            <span
+                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                c.primaryContact.portalAccess
+                                  ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
+                                  : "bg-slate-100 text-slate-700 border border-slate-300"
+                              }`}
+                            >
+                              <span
+                                className={`w-1.5 h-1.5 rounded-full ${
+                                  c.primaryContact.portalAccess ? "bg-emerald-600" : "bg-slate-400"
+                                }`}
+                              />
+                              {c.primaryContact.portalAccess ? "Portal Access: Enabled" : "Portal Access: Not Registered"}
+                            </span>
+                            {c.primaryContact.id && (
+                              <button
+                                type="button"
+                                onClick={() => handleTogglePortal(c.primaryContact!.id!, !c.primaryContact!.portalAccess)}
+                                disabled={togglingId === c.primaryContact.id}
+                                title={c.primaryContact.portalAccess ? "Disable customer portal access" : "Enable customer portal access"}
+                                className="text-[10px] text-primary hover:underline font-semibold disabled:opacity-50"
+                              >
+                                {togglingId === c.primaryContact.id
+                                  ? "Updating..."
+                                  : c.primaryContact.portalAccess
+                                  ? "Disable"
+                                  : "Enable"}
+                              </button>
+                            )}
+                          </div>
                         </div>
                       ) : (
                         <span className="text-outline italic">No contact assigned</span>

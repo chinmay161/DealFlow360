@@ -9,13 +9,64 @@ export interface FormatCurrencyOptions {
 }
 
 /**
- * Format a number as an Indian currency string (₹).
- * Defaults to 0 decimal places unless specified.
- * 
- * Examples:
- *   1830000 -> "₹18,30,000"
- *   658800  -> "₹6,58,800"
- *   100000  -> "₹1,00,000"
+ * Standard baseline exchange rates against INR (Base currency in DB)
+ * 1 USD = ₹87.50
+ * 1 EUR = ₹95.00
+ */
+export const EXCHANGE_RATES_FROM_INR: Record<string, number> = {
+  INR: 1,
+  USD: 1 / 87.50,
+  EUR: 1 / 95.00,
+};
+
+export const EXCHANGE_RATES_TO_INR: Record<string, number> = {
+  INR: 1,
+  USD: 87.50,
+  EUR: 95.00,
+};
+
+/**
+ * Convert an amount from base INR to target currency (INR, USD, EUR).
+ */
+export function convertFromINR(
+  amountInINR: number | null | undefined,
+  targetCurrency: string = "INR"
+): number {
+  const value = typeof amountInINR === "number" && !Number.isNaN(amountInINR) ? amountInINR : 0;
+  const curr = (targetCurrency || "INR").toUpperCase();
+  const rate = EXCHANGE_RATES_FROM_INR[curr] ?? 1;
+  const converted = value * rate;
+  return Math.round(converted * 100) / 100;
+}
+
+/**
+ * Convert an amount in a given currency to base INR.
+ */
+export function convertToINR(
+  amountInCurrency: number | null | undefined,
+  fromCurrency: string = "INR"
+): number {
+  const value = typeof amountInCurrency === "number" && !Number.isNaN(amountInCurrency) ? amountInCurrency : 0;
+  const curr = (fromCurrency || "INR").toUpperCase();
+  const rate = EXCHANGE_RATES_TO_INR[curr] ?? 1;
+  const converted = value * rate;
+  return Math.round(converted * 100) / 100;
+}
+
+/**
+ * Get currency symbol for a currency code.
+ */
+export function getCurrencySymbol(currency: string = "INR"): string {
+  const c = (currency || "INR").toUpperCase();
+  if (c === "INR" || c === "₹") return "₹";
+  if (c === "USD" || c === "$") return "$";
+  if (c === "EUR" || c === "€") return "€";
+  return c;
+}
+
+/**
+ * Format a number as a localized currency string.
+ * Supports INR (₹), USD ($), EUR (€), etc.
  */
 export function formatCurrency(
   amount: number | null | undefined,
@@ -23,22 +74,48 @@ export function formatCurrency(
   options: FormatCurrencyOptions = {}
 ): string {
   const value = typeof amount === "number" && !Number.isNaN(amount) ? amount : 0;
-  const isINR = !currency || currency.toUpperCase() === "INR" || currency === "₹";
+  const curr = (currency || "INR").toUpperCase();
+  const isINR = curr === "INR" || curr === "₹";
+  const isUSD = curr === "USD" || curr === "$";
+  const isEUR = curr === "EUR" || curr === "€";
 
-  const minDigits = options.minimumFractionDigits ?? 0;
-  const maxDigits = options.maximumFractionDigits ?? 0;
+  const minDigits = options.minimumFractionDigits ?? (isINR ? 0 : 2);
+  const maxDigits = options.maximumFractionDigits ?? (isINR ? 0 : 2);
 
   try {
-    return new Intl.NumberFormat("en-IN", {
+    if (isINR) {
+      return new Intl.NumberFormat("en-IN", {
+        style: "currency",
+        currency: "INR",
+        minimumFractionDigits: minDigits,
+        maximumFractionDigits: maxDigits,
+      }).format(value);
+    }
+    if (isUSD) {
+      return new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency: "USD",
+        minimumFractionDigits: minDigits,
+        maximumFractionDigits: maxDigits,
+      }).format(value);
+    }
+    if (isEUR) {
+      return new Intl.NumberFormat("en-IE", {
+        style: "currency",
+        currency: "EUR",
+        minimumFractionDigits: minDigits,
+        maximumFractionDigits: maxDigits,
+      }).format(value);
+    }
+    return new Intl.NumberFormat("en-US", {
       style: "currency",
-      currency: isINR ? "INR" : currency,
+      currency: curr,
       minimumFractionDigits: minDigits,
       maximumFractionDigits: maxDigits,
     }).format(value);
   } catch {
-    // Fallback if locale or currency code is unsupported
-    const formatted = formatIndianNumber(value, options);
-    return isINR ? `₹${formatted}` : `${currency} ${formatted}`;
+    const sym = getCurrencySymbol(curr);
+    return `${sym}${value.toFixed(minDigits)}`;
   }
 }
 

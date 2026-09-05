@@ -744,6 +744,8 @@ async function main() {
           title: cnt.title,
           isPrimary: cnt.isPrimary,
           portalAccess: cnt.portalAccess,
+          portalAccessEnabled: cnt.portalAccess,
+          isActive: true,
           userId: ('userId' in cnt && cnt.userId) ? cnt.userId : null,
         },
         create: {
@@ -756,6 +758,8 @@ async function main() {
           title: cnt.title,
           isPrimary: cnt.isPrimary,
           portalAccess: cnt.portalAccess,
+          portalAccessEnabled: cnt.portalAccess,
+          isActive: true,
         },
       });
     }

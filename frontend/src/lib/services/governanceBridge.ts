@@ -398,6 +398,40 @@ export async function returnApproval(
 // ──────────────────────────────────────────────────────────────────────────────
 // Canonical Configuration Module Integration
 // ──────────────────────────────────────────────────────────────────────────────
+// Canonical Configuration Module Integration
+// ──────────────────────────────────────────────────────────────────────────────
+
+function serializeDiscountPolicy(p: any) {
+  if (!p) return p;
+  return {
+    id: String(p.id),
+    name: String(p.name),
+    description: p.description ? String(p.description) : null,
+    type: String(p.type || "PERCENTAGE"),
+    value: p.value != null ? Number(p.value) : 0,
+    minOrderAmt: p.minOrderAmt != null ? Number(p.minOrderAmt) : null,
+    maxDiscount: p.maxDiscount != null ? Number(p.maxDiscount) : null,
+    tier: p.tier ? String(p.tier) : null,
+    isActive: Boolean(p.isActive),
+    createdAt: p.createdAt instanceof Date ? p.createdAt.toISOString() : (p.createdAt ? String(p.createdAt) : null),
+    updatedAt: p.updatedAt instanceof Date ? p.updatedAt.toISOString() : (p.updatedAt ? String(p.updatedAt) : null),
+  };
+}
+
+function serializeApprovalRule(r: any) {
+  if (!r) return r;
+  return {
+    id: String(r.id),
+    name: String(r.name),
+    description: r.description ? String(r.description) : null,
+    stage: Number(r.stage || 1),
+    threshold: r.threshold != null ? Number(r.threshold) : 0,
+    approverRole: String(r.approverRole || "MANAGER"),
+    isActive: Boolean(r.isActive),
+    createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : (r.createdAt ? String(r.createdAt) : null),
+    updatedAt: r.updatedAt instanceof Date ? r.updatedAt.toISOString() : (r.updatedAt ? String(r.updatedAt) : null),
+  };
+}
 
 export async function getDiscountPolicies(authContext?: InternalAuthContext) {
   try {
@@ -405,14 +439,20 @@ export async function getDiscountPolicies(authContext?: InternalAuthContext) {
       headers: getInternalHeaders(authContext),
       cache: "no-store",
     });
-    if (res.ok) return await res.json();
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        return data.map(serializeDiscountPolicy);
+      }
+    }
   } catch {
     // Fallback to database
   }
 
-  return (prisma as any).discountPolicy?.findMany({
+  const raw = await ((prisma as any).discountPolicy?.findMany({
     orderBy: { createdAt: "desc" },
-  }) ?? [];
+  }) ?? []);
+  return raw.map(serializeDiscountPolicy);
 }
 
 export async function createDiscountPolicy(data: any, authContext?: InternalAuthContext) {
@@ -423,12 +463,16 @@ export async function createDiscountPolicy(data: any, authContext?: InternalAuth
       body: JSON.stringify(data),
       cache: "no-store",
     });
-    if (res.ok) return await res.json();
+    if (res.ok) {
+      const result = await res.json();
+      return serializeDiscountPolicy(result);
+    }
   } catch {
     // Fallback
   }
 
-  return (prisma as any).discountPolicy?.create({ data }) ?? { id: "local-dp", ...data };
+  const created = await ((prisma as any).discountPolicy?.create({ data }) ?? { id: "local-dp", ...data });
+  return serializeDiscountPolicy(created);
 }
 
 export async function deleteDiscountPolicy(id: string, authContext?: InternalAuthContext) {
@@ -452,14 +496,20 @@ export async function getApprovalRules(authContext?: InternalAuthContext) {
       headers: getInternalHeaders(authContext),
       cache: "no-store",
     });
-    if (res.ok) return await res.json();
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        return data.map(serializeApprovalRule);
+      }
+    }
   } catch {
     // Fallback
   }
 
-  return (prisma as any).approvalRule?.findMany({
+  const raw = await ((prisma as any).approvalRule?.findMany({
     orderBy: { stage: "asc" },
-  }) ?? [];
+  }) ?? []);
+  return raw.map(serializeApprovalRule);
 }
 
 export async function createApprovalRule(data: any, authContext?: InternalAuthContext) {
@@ -470,12 +520,16 @@ export async function createApprovalRule(data: any, authContext?: InternalAuthCo
       body: JSON.stringify(data),
       cache: "no-store",
     });
-    if (res.ok) return await res.json();
+    if (res.ok) {
+      const result = await res.json();
+      return serializeApprovalRule(result);
+    }
   } catch {
     // Fallback
   }
 
-  return (prisma as any).approvalRule?.create({ data }) ?? { id: "local-ar", ...data };
+  const created = await ((prisma as any).approvalRule?.create({ data }) ?? { id: "local-ar", ...data });
+  return serializeApprovalRule(created);
 }
 
 export async function deleteApprovalRule(id: string, authContext?: InternalAuthContext) {

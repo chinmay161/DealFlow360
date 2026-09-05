@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { CustomerTier } from "@prisma/client";
+import { convertFromINR } from "@/lib/currency";
 
 export interface ResolvedPricing {
   productId: string;
@@ -13,7 +14,8 @@ export interface ResolvedPricing {
 
 export async function resolveProductPriceForCustomer(
   customerId: string,
-  productId: string
+  productId: string,
+  currency: string = "INR"
 ): Promise<ResolvedPricing> {
   const customer = await prisma.customer.findUnique({
     where: { id: customerId },
@@ -46,14 +48,18 @@ export async function resolveProductPriceForCustomer(
   });
 
   const priceItem = priceList?.items[0];
-  const unitPrice = priceItem ? Number(priceItem.price) : Number(product.unitPrice);
+  const rawUnitPrice = priceItem ? Number(priceItem.price) : Number(product.unitPrice);
+  const rawCostPrice = Number(product.costPrice);
+
+  const unitPrice = convertFromINR(rawUnitPrice, currency);
+  const costPrice = convertFromINR(rawCostPrice, currency);
 
   return {
     productId: product.id,
     sku: product.sku,
     productName: product.name,
     unitPrice,
-    costPrice: Number(product.costPrice),
+    costPrice,
     taxRate: Number(product.taxRate),
     priceListCode: priceList?.code || "DEFAULT",
   };

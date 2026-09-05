@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import { auth } from "@/auth";
 import { getCustomerQuotationDetail } from "@/lib/services/portalService";
 import { formatCurrency } from "@/lib/currency";
 import { CustomerNegotiationBox } from "@/components/portal/CustomerNegotiationBox";
+import { PortalLogoutButton } from "@/components/portal/PortalLogoutButton";
 
 interface PortalQuotationProps {
   params: Promise<{ id: string }>;
@@ -20,11 +22,20 @@ export async function generateMetadata({ params }: PortalQuotationProps): Promis
 }
 
 export default async function PortalQuotationDetailPage({ params }: PortalQuotationProps) {
+  const session = await auth();
+
+  // Server-side customer authorization
+  if (!session?.user || session.user.role !== "CUSTOMER" || !session.user.customerId) {
+    redirect("/portal");
+  }
+
   const { id } = await params;
   const decodedId = decodeURIComponent(id);
 
-  const quote = await getCustomerQuotationDetail(decodedId);
+  // Authoritative query scoped strictly to the customer belonging to this authenticated session
+  const quote = await getCustomerQuotationDetail(decodedId, session.user.customerId);
 
+  // If quote does not exist or belongs to another customer, return 404 without leaking existence
   if (!quote) {
     notFound();
   }
@@ -34,7 +45,7 @@ export default async function PortalQuotationDetailPage({ params }: PortalQuotat
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
       {/* Portal Top Bar */}
-      <header className="h-16 px-8 bg-white border-b border-[#E5E7EB] flex items-center justify-between sticky top-0 z-30 shadow-xs">
+      <header className="h-16 px-6 sm:px-8 bg-white border-b border-[#E5E7EB] flex items-center justify-between sticky top-0 z-30 shadow-xs">
         <div className="flex items-center gap-4">
           <Link
             href="/portal"
@@ -61,14 +72,15 @@ export default async function PortalQuotationDetailPage({ params }: PortalQuotat
           >
             {isAccepted ? "Accepted & Executed" : "Active Commercial Proposal"}
           </span>
+          <PortalLogoutButton />
         </div>
       </header>
 
       {/* Main Proposal Workspace */}
-      <main className="flex-1 max-w-5xl w-full mx-auto p-8 space-y-8">
+      <main className="flex-1 max-w-5xl w-full mx-auto p-6 sm:p-8 space-y-8">
         {/* Proposal Header Card */}
-        <div className="bg-white rounded-xl border border-[#E5E7EB] p-8 shadow-xs space-y-6">
-          <div className="flex items-start justify-between border-b pb-6">
+        <div className="bg-white rounded-xl border border-[#E5E7EB] p-6 sm:p-8 shadow-xs space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 border-b pb-6">
             <div>
               <span className="text-xs font-bold text-outline uppercase tracking-wider block">
                 Commercial Quotation
@@ -81,7 +93,7 @@ export default async function PortalQuotationDetailPage({ params }: PortalQuotat
               </p>
             </div>
 
-            <div className="text-right space-y-1 text-xs text-outline">
+            <div className="sm:text-right space-y-1 text-xs text-outline">
               <div>Issue Date: <strong className="text-on-surface">{quote.createdAt}</strong></div>
               <div>Valid Until: <strong className="text-on-surface">{quote.validUntil}</strong></div>
               <div>Currency: <strong className="text-on-surface">Indian Rupee (INR / ₹)</strong></div>

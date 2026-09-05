@@ -7,17 +7,20 @@ import { quotationService } from "@/services/quotation.service";
 import type { Product } from "@/types/quotation.types";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { formatCurrency, convertFromINR } from "@/lib/currency";
 
 interface ProductCatalogModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onAddProduct: (product: Product) => void;
+  currency?: string;
 }
 
 export function ProductCatalogModal({
   open,
   onOpenChange,
   onAddProduct,
+  currency = "INR",
 }: ProductCatalogModalProps) {
   const [search, setSearch] = useState("");
   const [products, setProducts] = useState<Product[]>([]);
@@ -89,7 +92,7 @@ export function ProductCatalogModal({
                     )}
                     <div className="text-[11px] text-slate-500 mt-1 flex items-center gap-3">
                       <span className="font-semibold text-slate-900">
-                        ₹{p.unitPrice.toLocaleString()} / {p.unit}
+                        {formatCurrency(convertFromINR(p.unitPrice, currency), currency)} / {p.unit}
                       </span>
                       <span>•</span>
                       <span>GST: {p.taxRate}%</span>
@@ -102,7 +105,10 @@ export function ProductCatalogModal({
                   size="sm"
                   variant="outline"
                   onClick={() => {
-                    onAddProduct(p);
+                    onAddProduct({
+                      ...p,
+                      unitPrice: convertFromINR(p.unitPrice, currency),
+                    });
                     onOpenChange(false);
                   }}
                   className="text-xs h-8"
