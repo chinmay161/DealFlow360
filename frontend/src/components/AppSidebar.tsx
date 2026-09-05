@@ -8,7 +8,10 @@ export const AppSidebar: React.FC = () => {
   const pathname = usePathname();
   const isApprovals = pathname === "/approvals" || pathname.startsWith("/approvals");
   const isDashboard = !isApprovals && (pathname === "/dashboard" || pathname.startsWith("/dashboard"));
-  const isQuotations = !isApprovals && !isDashboard && (pathname === "/" || pathname.startsWith("/quotations"));
+  const isFulfillment = pathname === "/fulfillment" || pathname.startsWith("/fulfillment/");
+  const isSubscriptions = pathname === "/subscriptions" || pathname.startsWith("/subscriptions/");
+  const isInvoices = pathname === "/invoices" || pathname.startsWith("/invoices/");
+  const isQuotations = !isApprovals && !isDashboard && !isFulfillment && !isSubscriptions && !isInvoices && (pathname === "/" || pathname.startsWith("/quotations"));
 
   return (
     <aside className="w-[260px] h-screen bg-surface-container-lowest border-r border-[#E5E7EB] flex flex-col justify-between flex-shrink-0 z-30 select-none">
@@ -113,18 +116,39 @@ export const AppSidebar: React.FC = () => {
         {/* Nav Section: Operations */}
         <div className="px-space-sm mt-space-md">
           <div className="px-space-sm py-1 font-label-sm text-[10px] uppercase font-bold text-outline tracking-wider">Operations</div>
-          <a className="flex items-center gap-space-sm px-space-md py-[6px] rounded-lg text-on-surface-variant font-body-md text-body-md hover:bg-surface-container-low transition-colors duration-150" href="#">
-            <span className="material-symbols-outlined text-outline" data-icon="local_shipping">local_shipping</span>
+          <Link
+            href="/fulfillment"
+            className={`flex items-center gap-space-sm px-space-md py-[6px] rounded-lg transition-colors duration-150 ${
+              isFulfillment
+                ? "bg-surface-container-low text-primary font-title-md text-body-md font-semibold"
+                : "text-on-surface-variant font-body-md text-body-md hover:bg-surface-container-low"
+            }`}
+          >
+            <span className={`material-symbols-outlined ${isFulfillment ? "text-primary" : "text-outline"}`} data-icon="local_shipping">local_shipping</span>
             <span>Fulfillment</span>
-          </a>
-          <a className="flex items-center gap-space-sm px-space-md py-[6px] rounded-lg text-on-surface-variant font-body-md text-body-md hover:bg-surface-container-low transition-colors duration-150" href="#">
-            <span className="material-symbols-outlined text-outline" data-icon="autorenew">autorenew</span>
+          </Link>
+          <Link
+            href="/subscriptions"
+            className={`flex items-center gap-space-sm px-space-md py-[6px] rounded-lg transition-colors duration-150 ${
+              isSubscriptions
+                ? "bg-surface-container-low text-primary font-title-md text-body-md font-semibold"
+                : "text-on-surface-variant font-body-md text-body-md hover:bg-surface-container-low"
+            }`}
+          >
+            <span className={`material-symbols-outlined ${isSubscriptions ? "text-primary" : "text-outline"}`} data-icon="autorenew">autorenew</span>
             <span>Subscriptions</span>
-          </a>
-          <a className="flex items-center gap-space-sm px-space-md py-[6px] rounded-lg text-on-surface-variant font-body-md text-body-md hover:bg-surface-container-low transition-colors duration-150" href="#">
-            <span className="material-symbols-outlined text-outline" data-icon="receipt_long">receipt_long</span>
+          </Link>
+          <Link
+            href="/invoices"
+            className={`flex items-center gap-space-sm px-space-md py-[6px] rounded-lg transition-colors duration-150 ${
+              isInvoices
+                ? "bg-surface-container-low text-primary font-title-md text-body-md font-semibold"
+                : "text-on-surface-variant font-body-md text-body-md hover:bg-surface-container-low"
+            }`}
+          >
+            <span className={`material-symbols-outlined ${isInvoices ? "text-primary" : "text-outline"}`} data-icon="receipt_long">receipt_long</span>
             <span>Invoices</span>
-          </a>
+          </Link>
         </div>
 
         {/* Nav Section: Intelligence */}
