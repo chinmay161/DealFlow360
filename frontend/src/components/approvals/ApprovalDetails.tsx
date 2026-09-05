@@ -3,6 +3,11 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { ApprovalItem } from "@/types/approval";
+import {
+  InventoryAvailabilityCard,
+  ReservationPreview,
+  ShipmentReadiness,
+} from "@/features/inventory/components";
 
 interface ApprovalDetailsProps {
   approval: ApprovalItem;
@@ -153,6 +158,54 @@ export const ApprovalDetails: React.FC<ApprovalDetailsProps> = ({
                 </p>
               </div>
             ))}
+          </div>
+        </div>
+
+        {/* SECTION: INVENTORY FULFILLMENT & STOCK READINESS */}
+        <div>
+          <div className="flex items-center justify-between pb-1 border-b border-[#F1F5F9] mb-2.5">
+            <div className="flex items-center gap-1.5">
+              <span className="material-symbols-outlined text-primary text-sm" data-icon="inventory_2">
+                inventory_2
+              </span>
+              <h3 className="font-title-md text-body-md font-semibold text-on-surface">
+                Inventory Fulfillment &amp; Stock Readiness
+              </h3>
+            </div>
+            <span className="text-[10px] font-label-sm font-semibold px-1.5 py-0.2 rounded bg-surface-container text-[#1E40AF]">
+              Hub Allocation
+            </span>
+          </div>
+
+          <div className="space-y-2.5">
+            {/* Inventory Summary Card */}
+            <InventoryAvailabilityCard
+              data={{
+                warehouseName: "Mumbai Central Hub",
+                warehouseCode: "WH-BOM",
+                availableStock: 220,
+                reservedStock: 35,
+                freeStock: 185,
+                status: "IN_STOCK",
+                lastUpdated: "Just now",
+                productName: `Deal Order Fulfillment (${approval.dealId})`,
+              }}
+              compact
+            />
+
+            {/* Reservation Preview and Shipment Readiness Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <ReservationPreview
+                warehouseName="Mumbai Central Hub"
+                willReserve={25}
+                currentAvailable={220}
+                currentReserved={35}
+              />
+              <ShipmentReadiness
+                isReady={true}
+                estimatedDispatch="Today"
+              />
+            </div>
           </div>
         </div>
 
