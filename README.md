@@ -1,56 +1,93 @@
 # DealFlow360
 
-Fullstack application built with Next.js 15 (App Router, TypeScript, Tailwind CSS, TanStack Query, React Hook Form, Zod, Recharts), Prisma ORM, and Dockerized PostgreSQL 16.
+Enterprise Quotation Builder, Executive Dashboard, and Commercial Approval Platform built with Next.js 15 (App Router, TypeScript, Tailwind CSS), Prisma ORM, and PostgreSQL 16.
 
-Frontend and Backend APIs run together seamlessly on **the same port (`3000`)**.
+The Next.js application serves both frontend views and backend route handlers.
 
-## Project Architecture
+---
 
-```
-DealFlow360/
-├── docker-compose.yml     # PostgreSQL 16 container
-├── .env.example           # Root environment configuration
-├── frontend/              # Fullstack Next.js 15 app (Frontend & Backend on port 3000)
-│   ├── prisma/            # Prisma schema (PostgreSQL)
-│   ├── src/
-│   │   ├── app/           # App Router (pages & /api backend routes)
-│   │   │   ├── api/
-│   │   │   │   └── health/route.ts
-│   │   │   ├── layout.tsx
-│   │   │   └── page.tsx
-│   │   └── lib/           # Prisma client singleton & shared utilities
-│   └── package.json
-└── backend/               # Standalone Express + TypeScript service (alternative)
-    ├── prisma/
-    ├── src/
-    └── package.json
-```
+## 1. Local PostgreSQL (Docker)
 
-## Getting Started
-
-### 1. Start PostgreSQL (Docker)
+Start the PostgreSQL 16 container:
 
 ```bash
 docker compose up -d
 ```
 
-PostgreSQL will be running on `localhost:5432` with database `dealflow360`.
+Stop the PostgreSQL container:
 
-### 2. Run Application (Same Port: 3000)
+```bash
+docker compose down
+```
+
+PostgreSQL runs with database `dealflow360` and persistent data stored in Docker volume `postgres_data`.
+
+---
+
+## 2. Environment Configuration & Google OAuth
+
+Copy `.env.example` into `.env.local` at the repository root:
+
+```bash
+# Database
+DATABASE_URL="postgresql://dealflow:dealflow_password@localhost:5432/dealflow360"
+
+# Auth.js / NextAuth
+AUTH_SECRET="your-32-char-random-secret"
+AUTH_URL="http://localhost:3000"
+
+# Google OAuth Credentials
+GOOGLE_CLIENT_ID="your-google-client-id.apps.googleusercontent.com"
+GOOGLE_CLIENT_SECRET="your-google-client-secret"
+```
+
+*(Note: If port 5432 is already occupied by a host service on your machine, set `POSTGRES_PORT=5433` and use port `5433` in `DATABASE_URL`)*.
+
+### Google Cloud Console Configuration:
+1. Go to [Google Cloud Console](https://console.cloud.google.com/) -> **APIs & Services** -> **Credentials**.
+2. Create an **OAuth 2.0 Client ID** (Application type: *Web application*).
+3. Under **Authorized JavaScript origins**, add:
+   - `http://localhost:3000`
+4. Under **Authorized redirect URIs**, add:
+   - `http://localhost:3000/api/auth/callback/google`
+5. Copy the generated **Client ID** and **Client Secret** into your `.env.local`.
+
+---
+
+## 3. Prisma Database Operations
+
+From the `frontend/` directory:
+
+- **Generate Prisma Client:**
+  ```bash
+  npx prisma generate
+  ```
+
+- **Create a new migration:**
+  ```bash
+  npx prisma migrate dev --name <migration_name>
+  ```
+
+- **Apply pending migrations:**
+  ```bash
+  npx prisma migrate deploy
+  ```
+
+- **Open Prisma Studio (database GUI):**
+  ```bash
+  npx prisma studio
+  ```
+
+---
+
+## 4. Running the Application
 
 ```bash
 cd frontend
 npm run dev
 ```
 
-- **Web UI**: [http://localhost:3000](http://localhost:3000)
-- **Backend API**: [http://localhost:3000/api/health](http://localhost:3000/api/health)
-
-### 3. Database Migrations (Prisma)
-
-From the `frontend` folder:
-
-```bash
-npx prisma generate
-npx prisma db push # or npx prisma migrate dev
-```
+- **Quotation Builder:** [http://localhost:3000](http://localhost:3000)
+- **Executive Dashboard:** [http://localhost:3000/dashboard](http://localhost:3000/dashboard)
+- **Approvals Center:** [http://localhost:3000/approvals](http://localhost:3000/approvals)
+- **Database & Backend Health Check:** [http://localhost:3000/api/health](http://localhost:3000/api/health)

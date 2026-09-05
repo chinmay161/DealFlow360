@@ -1,11 +1,52 @@
 "use client";
 
-import React from "react";
+import React, { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useSession, signOut } from "next-auth/react";
 
 export const AppSidebar: React.FC = () => {
   const pathname = usePathname();
+  const { data: session } = useSession();
+  const [showMenu, setShowMenu] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setShowMenu(false);
+      }
+    }
+    if (showMenu) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [showMenu]);
+
+  const [imgError, setImgError] = useState(false);
+
+  const userName =
+    session?.user?.name ||
+    (session?.user?.email ? session.user.email.split("@")[0] : "Commercial User");
+  const userEmail = session?.user?.email || "operator@dealflow360.io";
+  const userRole =
+    (session?.user as { role?: string })?.role === "ADMIN"
+      ? "Administrator"
+      : (session?.user as { role?: string })?.role === "APPROVER"
+      ? "Approval Authority"
+      : "Sales Representative";
+
+  const initials =
+    userName
+      .split(" ")
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0].toUpperCase())
+      .join("") || "CU";
+  const avatarUrl = session?.user?.image;
+
   const isApprovals = pathname === "/approvals" || pathname.startsWith("/approvals");
   const isDashboard = !isApprovals && (pathname === "/dashboard" || pathname.startsWith("/dashboard"));
   const isFulfillment = pathname === "/fulfillment" || pathname.startsWith("/fulfillment/");
@@ -166,20 +207,60 @@ export const AppSidebar: React.FC = () => {
       </div>
 
       {/* Bottom User Operator Profile */}
-      <div className="p-space-sm border-t border-[#E5E7EB] bg-surface-bright">
-        <div className="flex items-center justify-between p-space-xs rounded-lg hover:bg-surface-container-low cursor-pointer transition-colors duration-150">
-          <div className="flex items-center gap-space-sm">
-            <img
-              className="w-8 h-8 rounded-full border border-[#D1D5DB] object-cover"
-              alt="James Carter"
-              src="/james-carter.jpg"
-            />
-            <div className="flex flex-col">
-              <span className="font-title-md text-label-md text-on-surface font-semibold leading-tight">James Carter</span>
-              <span className="font-body-sm text-[11px] text-outline leading-tight">Sales Manager</span>
+      <div className="relative p-space-sm border-t border-[#E5E7EB] bg-surface-bright" ref={menuRef}>
+        {showMenu && (
+          <div className="absolute bottom-full mb-2 left-2 right-2 bg-surface-container-lowest border border-[#E5E7EB] rounded-xl shadow-xl p-1 z-50 animate-in fade-in slide-in-from-bottom-2 duration-150">
+            <div className="px-3 py-2 border-b border-[#F3F4F6]">
+              <p className="text-xs font-semibold text-on-surface truncate">{userName}</p>
+              <p className="text-[11px] text-outline truncate">{userEmail}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => signOut({ callbackUrl: "/login" })}
+              className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-error hover:bg-error-container/30 rounded-lg transition-colors cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-base" data-icon="logout">
+                logout
+              </span>
+              <span>Sign Out</span>
+            </button>
+          </div>
+        )}
+
+        <div
+          onClick={() => setShowMenu(!showMenu)}
+          className="flex items-center justify-between p-space-xs rounded-lg hover:bg-surface-container-low cursor-pointer transition-colors duration-150"
+        >
+          <div className="flex items-center gap-space-sm min-w-0">
+            {avatarUrl && !imgError ? (
+              <img
+                className="w-8 h-8 rounded-full border border-[#D1D5DB] object-cover flex-shrink-0"
+                alt={userName}
+                src={avatarUrl}
+                onError={() => setImgError(true)}
+              />
+            ) : (
+              <div className="w-8 h-8 rounded-full bg-primary text-on-primary flex items-center justify-center text-xs font-bold flex-shrink-0 border border-[#D1D5DB] shadow-sm select-none">
+                {initials}
+              </div>
+            )}
+            <div className="flex flex-col min-w-0">
+              <span className="font-title-md text-label-md text-on-surface font-semibold leading-tight truncate">
+                {userName}
+              </span>
+              <span className="font-body-sm text-[11px] text-outline leading-tight truncate">
+                {userRole}
+              </span>
             </div>
           </div>
-          <span className="material-symbols-outlined text-outline hover:text-on-surface" data-icon="more_vert">more_vert</span>
+          <span
+            className={`material-symbols-outlined text-outline hover:text-on-surface transition-transform duration-150 flex-shrink-0 ${
+              showMenu ? "rotate-90 text-on-surface" : ""
+            }`}
+            data-icon="more_vert"
+          >
+            more_vert
+          </span>
         </div>
       </div>
     </aside>
