@@ -78,7 +78,24 @@ enum ApprovalAction {
   REQUEST_CHANGES
 }
 
+enum OrderStatus {
+  DRAFT
+  CONFIRMED
+  IN_FULFILLMENT
+  PARTIALLY_FULFILLED
+  FULFILLED
+  CANCELLED
+}
+
+enum OrderLineType {
+  PHYSICAL
+  SERVICE
+  SUBSCRIPTION
+}
+
 enum ShipmentStatus {
+  PLANNED
+  READY
   PENDING
   PICKED
   PACKED
@@ -121,10 +138,34 @@ enum NotificationStatus {
 }
 
 enum ReservationStatus {
+  PENDING
+  CONFIRMED
   ACTIVE
   RELEASED
   EXPIRED
   FULFILLED
+  CANCELLED
+}
+
+enum BackorderStatus {
+  OPEN
+  CONSOLIDATED
+  FULFILLED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  PARTIALLY_ALLOCATED
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+enum PaymentMethod {
+  BANK_TRANSFER
+  CREDIT_CARD
+  OTHER
 }
 
 enum DiscountType {
@@ -244,6 +285,7 @@ model Customer {
 
   // ── Relations ──
   quotations    Quotation[]
+  orders        Order[]
   subscriptions Subscription[]
   invoices      Invoice[]
 
@@ -291,8 +333,12 @@ model Product {
 
   priceListEntries PriceList[]
   quotationLines   QuotationLine[]
+  orderLines       OrderLine[]
   stockLevels      StockLevel[]
   reservations     Reservation[]
+  reservationItems ReservationItem[]
+  shipmentItems    ShipmentItem[]
+  backorders       Backorder[]
 
   @@index([sku])
   @@index([categoryId])
@@ -355,6 +401,7 @@ model Quotation {
   salesRep        User     @relation("QuotationSalesRep", fields: [salesRepId], references: [id], onDelete: Restrict)
 
   lines           QuotationLine[]
+  orders          Order[]
   approvals       Approval[]
   ruleEvaluations RuleEvaluation[]
   reservations    Reservation[]
@@ -362,6 +409,7 @@ model Quotation {
   invoices        Invoice[]
   dealHealth      DealHealth?
   anomalies       Anomaly[]
+  marginSnapshots MarginSnapshot[]
 
   @@index([quoteNumber])
   @@index([customerId])
@@ -392,9 +440,77 @@ model QuotationLine {
   product     Product   @relation(fields: [productId], references: [id], onDelete: Restrict)
 
   invoiceLines InvoiceLine[]
+  orderLines   OrderLine[]
 
   @@index([quotationId])
   @@index([productId])
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Orders
+// ──────────────────────────────────────────────────────────────────────────────
+
+/// Commercial order created from an accepted / finalized quotation. Owner C
+/// fulfillment, billing, and margin records attach here so the approved deal can
+/// become executable operations.
+model Order {
+  id          String      @id @default(uuid())
+  orderNumber String      @unique
+  status      OrderStatus @default(DRAFT)
+  totalAmount Decimal     @default(0) @db.Decimal(18, 4)
+  currency    String      @default("USD")
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  quotationId String
+  quotation   Quotation @relation(fields: [quotationId], references: [id], onDelete: Restrict)
+
+  customerId  String
+  customer    Customer  @relation(fields: [customerId], references: [id], onDelete: Restrict)
+
+  lines           OrderLine[]
+  reservations    Reservation[]
+  shipments       Shipment[]
+  subscriptions   Subscription[]
+  invoices        Invoice[]
+  backorders      Backorder[]
+  marginSnapshots MarginSnapshot[]
+
+  @@index([orderNumber])
+  @@index([quotationId])
+  @@index([customerId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model OrderLine {
+  id         String        @id @default(uuid())
+  quantity   Int
+  unitPrice  Decimal       @db.Decimal(18, 4)
+  discount   Decimal       @default(0) @db.Decimal(18, 4)
+  lineTotal  Decimal       @default(0) @db.Decimal(18, 4)
+  lineType   OrderLineType @default(PHYSICAL)
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  orderId    String
+  order      Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  productId  String
+  product    Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  /// Optional source quotation line for Quote → Order traceability.
+  quotationLineId String?
+  quotationLine   QuotationLine? @relation(fields: [quotationLineId], references: [id], onDelete: SetNull)
+
+  reservationItems ReservationItem[]
+  shipmentItems    ShipmentItem[]
+  backorders       Backorder[]
+
+  @@index([orderId])
+  @@index([productId])
+  @@index([quotationLineId])
+  @@index([lineType])
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -552,21 +668,33 @@ model StockLevel {
 
 model Reservation {
   id              String            @id @default(uuid())
-  reservedQty     Int
-  status          ReservationStatus @default(ACTIVE)
+  reservationNumber String?         @unique
+  /// Legacy summary quantity retained for compatibility with the existing
+  /// single-product reservation shape. New fulfillment flows should use items.
+  reservedQty     Int?
+  status          ReservationStatus @default(PENDING)
   expiresAt       DateTime?
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
 
-  quotationId     String
-  quotation       Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  orderId         String?
+  order           Order?    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  quotationId     String?
+  quotation       Quotation? @relation(fields: [quotationId], references: [id], onDelete: SetNull)
 
   warehouseId     String
   warehouse       Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
 
-  productId       String
-  product         Product   @relation(fields: [productId], references: [id], onDelete: Restrict)
+  /// Legacy product reference retained for compatibility with the previous
+  /// single-product reservation model. New flows should use ReservationItem.
+  productId       String?
+  product         Product?  @relation(fields: [productId], references: [id], onDelete: SetNull)
 
+  items           ReservationItem[]
+
+  @@index([reservationNumber])
+  @@index([orderId])
   @@index([quotationId])
   @@index([warehouseId])
   @@index([productId])
@@ -574,12 +702,34 @@ model Reservation {
   @@index([expiresAt])
 }
 
+model ReservationItem {
+  id            String   @id @default(uuid())
+  quantity      Int
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  reservationId String
+  reservation   Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+
+  productId     String
+  product       Product     @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  orderLineId   String?
+  orderLine     OrderLine?  @relation(fields: [orderLineId], references: [id], onDelete: SetNull)
+
+  @@index([reservationId])
+  @@index([productId])
+  @@index([orderLineId])
+}
+
 model Shipment {
   id             String         @id @default(uuid())
   shipmentNumber String         @unique
-  status         ShipmentStatus @default(PENDING)
+  status         ShipmentStatus @default(PLANNED)
   trackingNumber String?
   carrier        String?
+  estimatedCost  Decimal?       @db.Decimal(18, 4)
+  actualCost     Decimal?       @db.Decimal(18, 4)
   shippedAt      DateTime?
   deliveredAt    DateTime?
   createdAt      DateTime       @default(now())
@@ -588,12 +738,62 @@ model Shipment {
   warehouseId    String
   warehouse      Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
 
-  quotationId    String
-  quotation      Quotation @relation(fields: [quotationId], references: [id], onDelete: Restrict)
+  orderId        String?
+  order          Order?    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  quotationId    String?
+  quotation      Quotation? @relation(fields: [quotationId], references: [id], onDelete: SetNull)
+
+  items          ShipmentItem[]
 
   @@index([shipmentNumber])
+  @@index([orderId])
   @@index([warehouseId])
   @@index([quotationId])
+  @@index([status])
+}
+
+model ShipmentItem {
+  id          String   @id @default(uuid())
+  quantity    Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  shipmentId  String
+  shipment    Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  orderLineId String?
+  orderLine   OrderLine? @relation(fields: [orderLineId], references: [id], onDelete: SetNull)
+
+  @@index([shipmentId])
+  @@index([productId])
+  @@index([orderLineId])
+}
+
+model Backorder {
+  id          String          @id @default(uuid())
+  quantity    Int
+  status      BackorderStatus @default(OPEN)
+  reason      String?
+  fulfilledAt DateTime?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  orderId     String
+  order       Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  productId   String
+  product     Product         @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  orderLineId String?
+  orderLine   OrderLine?      @relation(fields: [orderLineId], references: [id], onDelete: SetNull)
+
+  @@index([orderId])
+  @@index([productId])
+  @@index([orderLineId])
   @@index([status])
 }
 
@@ -645,10 +845,14 @@ model Subscription {
   ownerId         String
   owner           User @relation("SubscriptionOwner", fields: [ownerId], references: [id], onDelete: Restrict)
 
+  orderId         String?
+  order           Order? @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
   recurringInvoices RecurringInvoice[]
 
   @@index([customerId])
   @@index([planId])
+  @@index([orderId])
   @@index([status])
   @@index([nextBillingDate])
 }
@@ -671,6 +875,7 @@ model RecurringInvoice {
   subscription   Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
 
   creditNotes    CreditNote[]
+  payments       Payment[]
 
   @@index([subscriptionId])
   @@index([invoiceNumber])
@@ -678,7 +883,9 @@ model RecurringInvoice {
   @@index([dueDate])
 }
 
-/// Credit notes issued against recurring invoices (partial refunds, prorations).
+/// Credit notes issued against invoices or recurring invoices (partial refunds,
+/// prorations). Application logic should attach a credit note to at least one
+/// invoice source.
 model CreditNote {
   id               String   @id @default(uuid())
   creditNoteNumber String   @unique
@@ -689,9 +896,13 @@ model CreditNote {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
-  recurringInvoiceId String
-  recurringInvoice   RecurringInvoice @relation(fields: [recurringInvoiceId], references: [id], onDelete: Cascade)
+  invoiceId          String?
+  invoice            Invoice? @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 
+  recurringInvoiceId String?
+  recurringInvoice   RecurringInvoice? @relation(fields: [recurringInvoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
   @@index([recurringInvoiceId])
   @@index([creditNoteNumber])
 }
@@ -722,11 +933,17 @@ model Invoice {
   quotationId   String
   quotation     Quotation @relation(fields: [quotationId], references: [id], onDelete: Restrict)
 
+  orderId       String?
+  order         Order? @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
   lines         InvoiceLine[]
+  payments      Payment[]
+  creditNotes   CreditNote[]
 
   @@index([invoiceNumber])
   @@index([customerId])
   @@index([quotationId])
+  @@index([orderId])
   @@index([status])
   @@index([dueDate])
 }
@@ -751,6 +968,32 @@ model InvoiceLine {
 
   @@index([invoiceId])
   @@index([quotationLineId])
+}
+
+model Payment {
+  id                String        @id @default(uuid())
+  paymentReference  String        @unique
+  amount            Decimal       @db.Decimal(18, 4)
+  currency          String        @default("USD")
+  method            PaymentMethod
+  status            PaymentStatus @default(PENDING)
+  paidAt            DateTime?
+  externalReference String?
+  notes             String?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  invoiceId         String?
+  invoice           Invoice? @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  recurringInvoiceId String?
+  recurringInvoice   RecurringInvoice? @relation(fields: [recurringInvoiceId], references: [id], onDelete: Cascade)
+
+  @@index([paymentReference])
+  @@index([invoiceId])
+  @@index([recurringInvoiceId])
+  @@index([status])
+  @@index([paidAt])
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -828,6 +1071,33 @@ model DealHealth {
   quotation        Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
 
   @@index([overallScore])
+}
+
+/// Point-in-time margin economics for a quotation/order. Quotation.lifetimeMargin
+/// remains the cached summary value; snapshots preserve calculation history for
+/// later Owner C margin analysis.
+model MarginSnapshot {
+  id              String   @id @default(uuid())
+  revenue         Decimal  @default(0) @db.Decimal(18, 4)
+  discount        Decimal  @default(0) @db.Decimal(18, 4)
+  cost            Decimal  @default(0) @db.Decimal(18, 4)
+  fulfillmentCost Decimal  @default(0) @db.Decimal(18, 4)
+  credits         Decimal  @default(0) @db.Decimal(18, 4)
+  realizedMargin  Decimal  @default(0) @db.Decimal(18, 4)
+  marginPercentage Decimal @default(0) @db.Decimal(5, 4)
+  calculatedAt    DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  quotationId     String?
+  quotation       Quotation? @relation(fields: [quotationId], references: [id], onDelete: SetNull)
+
+  orderId         String?
+  order           Order? @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@index([quotationId])
+  @@index([orderId])
+  @@index([calculatedAt])
 }
 
 /// Individual anomaly signals detected on quotations (e.g. unusual discount,

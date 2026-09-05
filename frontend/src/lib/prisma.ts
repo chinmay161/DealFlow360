@@ -1,3 +1,10 @@
+import path from "path";
+import dotenv from "dotenv";
+
+// Ensure root .env.local is loaded
+dotenv.config({ path: path.resolve(process.cwd(), "../.env.local") });
+dotenv.config({ path: path.resolve(process.cwd(), ".env.local") });
+
 import { PrismaClient } from "@prisma/client";
 
 const globalForPrisma = globalThis as unknown as {

@@ -14,11 +14,212 @@ enum UserRole {
   CUSTOMER
 }
 
+enum QuotationStatus {
+  DRAFT
+  IN_REVIEW
+  APPROVED
+  REJECTED
+  EXPIRED
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  ESCALATED
+  CANCELLED
+}
+
+enum ApprovalPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum WorkflowStepStatus {
+  PENDING
+  IN_PROGRESS
+  APPROVED
+  REJECTED
+  SKIPPED
+}
+
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  name      String?
-  role      UserRole @default(SALES_REP)
+  id                 String                 @id @default(uuid())
+  email              String                 @unique
+  name               String?
+  emailVerified      DateTime?
+  image              String?
+  avatarUrl          String?
+  role               UserRole               @default(SALES_REP)
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+
+  accounts           Account[]
+  sessions           Session[]
+
+  ownedQuotations    Quotation[]            @relation("QuotationOwner")
+  requestedApprovals Approval[]             @relation("ApprovalRequester")
+  assignedApprovals  Approval[]             @relation("ApprovalAssignee")
+  workflowSteps      ApprovalWorkflowStep[] @relation("StepApprover")
+  approvalHistories  ApprovalHistory[]      @relation("HistoryActor")
+}
+
+model Customer {
+  id                String      @id @default(uuid())
+  name              String
+  externalAccountId String?
+  industry          String?
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  quotations        Quotation[]
+}
+
+model Quotation {
+  id              String            @id @default(uuid())
+  quotationNumber String            @unique
+  customerId      String
+  customer        Customer          @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  ownerId         String
+  owner           User              @relation("QuotationOwner", fields: [ownerId], references: [id])
+  status          QuotationStatus   @default(DRAFT)
+  currentStage    String?
+  currency        String            @default("USD")
+  subtotal        Decimal           @default(0.00) @db.Decimal(14, 2)
+  discountTotal   Decimal           @default(0.00) @db.Decimal(14, 2)
+  taxTotal        Decimal           @default(0.00) @db.Decimal(14, 2)
+  totalValue      Decimal           @default(0.00) @db.Decimal(14, 2)
+  estimatedMargin Decimal           @default(0.00) @db.Decimal(5, 2)
+  riskScore       Int?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  lineItems       QuoteLineItem[]
+  approvals       Approval[]
+
+  @@index([customerId])
+  @@index([ownerId])
+  @@index([status])
+}
+
+model QuoteLineItem {
+  id                     String    @id @default(uuid())
+  quotationId            String
+  quotation              Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  productName            String
+  sku                    String?
+  quantity               Int       @default(1)
+  unitPrice              Decimal   @default(0.00) @db.Decimal(14, 2)
+  discountPercent        Decimal   @default(0.00) @db.Decimal(5, 2)
+  discountLimitPercent   Decimal?  @db.Decimal(5, 2)
+  estimatedMarginPercent Decimal?  @db.Decimal(5, 2)
+  lineTotal              Decimal   @default(0.00) @db.Decimal(14, 2)
+  governanceStatus       String?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  @@index([quotationId])
+}
+
+model Approval {
+  id            String                 @id @default(uuid())
+  quotationId   String
+  quotation     Quotation              @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  status        ApprovalStatus         @default(PENDING)
+  priority      ApprovalPriority       @default(MEDIUM)
+  currentStep   Int                    @default(1)
+  requestedById String
+  requestedBy   User                   @relation("ApprovalRequester", fields: [requestedById], references: [id])
+  assignedToId  String?
+  assignedTo    User?                  @relation("ApprovalAssignee", fields: [assignedToId], references: [id])
+  submittedAt   DateTime               @default(now())
+  resolvedAt    DateTime?
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
+
+  workflowSteps ApprovalWorkflowStep[]
+  history       ApprovalHistory[]
+
+  @@index([quotationId])
+  @@index([requestedById])
+  @@index([assignedToId])
+  @@index([status])
+}
+
+model ApprovalWorkflowStep {
+  id          String             @id @default(uuid())
+  approvalId  String
+  approval    Approval           @relation(fields: [approvalId], references: [id], onDelete: Cascade)
+  stepOrder   Int
+  role        String
+  approverId  String?
+  approver    User?              @relation("StepApprover", fields: [approverId], references: [id])
+  status      WorkflowStepStatus @default(PENDING)
+  notes       String?
+  completedAt DateTime?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  @@index([approvalId])
+  @@index([approverId])
+}
+
+model ApprovalHistory {
+  id         String   @id @default(uuid())
+  approvalId String
+  approval   Approval @relation(fields: [approvalId], references: [id], onDelete: Cascade)
+  actorId    String?
+  actor      User?    @relation("HistoryActor", fields: [actorId], references: [id])
+  eventType  String
+  message    String
+  createdAt  DateTime @default(now())
+
+  @@index([approvalId])
+  @@index([actorId])
+}
+
+model Account {
+  id                String  @id @default(uuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(uuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@id([identifier, token])
 }
