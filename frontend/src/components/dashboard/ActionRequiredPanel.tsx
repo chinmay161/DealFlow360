@@ -18,29 +18,8 @@ interface ActionRequiredPanelProps {
   items?: ActionItem[];
 }
 
-export const ActionRequiredPanel: React.FC<ActionRequiredPanelProps> = ({ items }) => {
-  const displayItems = items && items.length > 0 ? items : [
-    {
-      id: "act-1",
-      dealId: "Q-1042",
-      customer: "Apex Infotech Pvt. Ltd.",
-      role: "Finance Review",
-      assignee: "Meera Joshi",
-      timeAgo: "High priority",
-      priority: "HIGH",
-      href: "/approvals",
-    },
-    {
-      id: "act-2",
-      dealId: "Q-1041",
-      customer: "BharatGrid Systems",
-      role: "Sales Management",
-      assignee: "Vikram Desai",
-      timeAgo: "Medium priority",
-      priority: "MEDIUM",
-      href: "/approvals",
-    },
-  ];
+export const ActionRequiredPanel: React.FC<ActionRequiredPanelProps> = ({ items = [] }) => {
+  const displayItems = items || [];
 
   return (
     <div className="bg-white border border-[#E5E7EB] rounded-lg p-space-base shadow-[0px_1px_2px_rgba(15,23,42,0.04)] flex flex-col justify-between">
@@ -55,14 +34,29 @@ export const ActionRequiredPanel: React.FC<ActionRequiredPanelProps> = ({ items 
               Action Required
             </h3>
           </div>
-          <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[#FFF1F2] text-[#9F1239] border border-[#FECDD3]">
-            {displayItems.length} Critical
+          <span
+            className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
+              displayItems.length > 0
+                ? "bg-[#FFF1F2] text-[#9F1239] border-[#FECDD3]"
+                : "bg-emerald-50 text-emerald-700 border-emerald-200"
+            }`}
+          >
+            {displayItems.length > 0 ? `${displayItems.length} Critical` : "Compliant"}
           </span>
         </div>
 
         {/* Action Items List */}
         <div className="space-y-2.5">
-          {displayItems.slice(0, 4).map((item) => {
+          {displayItems.length === 0 ? (
+            <div className="py-6 text-center text-outline">
+              <span className="material-symbols-outlined text-3xl text-emerald-500 mb-1" data-icon="check_circle">
+                check_circle
+              </span>
+              <p className="text-body-sm font-medium text-on-surface">No Critical Actions Pending</p>
+              <p className="text-[11px] text-outline mt-0.5">All active deals are within governance thresholds.</p>
+            </div>
+          ) : (
+            displayItems.slice(0, 4).map((item) => {
             const isHigh = item.priority === "HIGH" || item.priority === "URGENT";
             return (
               <div
@@ -103,7 +97,8 @@ export const ActionRequiredPanel: React.FC<ActionRequiredPanelProps> = ({ items 
                 </div>
               </div>
             );
-          })}
+          })
+        )}
         </div>
       </div>
 

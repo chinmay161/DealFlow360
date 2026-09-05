@@ -42,7 +42,13 @@ export async function getDashboardMetrics() {
   let mediumRiskCount = 0;
   let lowRiskCount = 0;
 
-  const stageCounts: Record<string, number> = {};
+  const stageStats: Record<string, { count: number; value: number }> = {
+    Qualification: { count: 0, value: 0 },
+    Proposal: { count: 0, value: 0 },
+    Negotiation: { count: 0, value: 0 },
+    Approval: { count: 0, value: 0 },
+    "Closed Won": { count: 0, value: 0 },
+  };
 
   for (const q of quotations) {
     const val = Number(q.totalValue);
@@ -58,8 +64,12 @@ export async function getDashboardMetrics() {
     else if (risk >= 40) mediumRiskCount++;
     else lowRiskCount++;
 
-    const stage = q.currentStage || "Drafting";
-    stageCounts[stage] = (stageCounts[stage] || 0) + 1;
+    const stage = q.currentStage || (q.status === QuotationStatus.APPROVED ? "Closed Won" : "Proposal");
+    if (!stageStats[stage]) {
+      stageStats[stage] = { count: 0, value: 0 };
+    }
+    stageStats[stage].count += 1;
+    stageStats[stage].value += val;
   }
 
   return {
@@ -108,9 +118,11 @@ export async function getDashboardMetrics() {
       highRiskCount,
       totalCount: quotations.length,
     },
-    pipelineStages: Object.entries(stageCounts).map(([stage, count]) => ({
+    pipelineStages: Object.entries(stageStats).map(([stage, stat]) => ({
       stage,
-      count,
+      count: stat.count,
+      value: stat.value,
+      displayValue: formatCurrency(stat.value, "INR"),
     })),
     recentActivity: recentHistory.map((hist) => ({
       id: hist.id,

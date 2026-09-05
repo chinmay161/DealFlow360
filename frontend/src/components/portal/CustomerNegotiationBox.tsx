@@ -17,6 +17,11 @@ interface CustomerNegotiationBoxProps {
   quotationNumber: string;
   currentStatus: string;
   negotiations: NegotiationItem[];
+  defaultSignatory?: {
+    name: string;
+    title?: string | null;
+    email: string;
+  } | null;
 }
 
 export const CustomerNegotiationBox: React.FC<CustomerNegotiationBoxProps> = ({
@@ -24,6 +29,7 @@ export const CustomerNegotiationBox: React.FC<CustomerNegotiationBoxProps> = ({
   quotationNumber,
   currentStatus,
   negotiations,
+  defaultSignatory,
 }) => {
   const router = useRouter();
   const [commentText, setCommentText] = useState("");
@@ -31,9 +37,9 @@ export const CustomerNegotiationBox: React.FC<CustomerNegotiationBoxProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSigning, setIsSigning] = useState(false);
   const [isSignModalOpen, setIsSignModalOpen] = useState(false);
-  const [signatoryName, setSignatoryName] = useState("Ananya Shah");
-  const [signatoryTitle, setSignatoryTitle] = useState("VP Procurement");
-  const [signatoryEmail, setSignatoryEmail] = useState("ananya.shah@apexinfotech.example");
+  const [signatoryName, setSignatoryName] = useState(defaultSignatory?.name || "Procurement Officer");
+  const [signatoryTitle, setSignatoryTitle] = useState(defaultSignatory?.title || "Commercial Buyer");
+  const [signatoryEmail, setSignatoryEmail] = useState(defaultSignatory?.email || "procurement@commercial.in");
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const isAccepted = currentStatus === "ACCEPTED";

@@ -9,12 +9,12 @@ interface PipelineStage {
   count: number;
 }
 
-const stages: PipelineStage[] = [
-  { stage: "Qualification", value: 180, displayValue: "₹18.0L", count: 8 },
-  { stage: "Proposal", value: 420, displayValue: "₹42.0L", count: 6 },
-  { stage: "Negotiation", value: 356, displayValue: "₹35.6L", count: 5 },
-  { stage: "Approval", value: 210, displayValue: "₹21.0L", count: 3 },
-  { stage: "Closed Won", value: 324, displayValue: "₹32.4L", count: 4 },
+const defaultStages: PipelineStage[] = [
+  { stage: "Qualification", value: 0, displayValue: "₹0", count: 0 },
+  { stage: "Proposal", value: 0, displayValue: "₹0", count: 0 },
+  { stage: "Negotiation", value: 0, displayValue: "₹0", count: 0 },
+  { stage: "Approval", value: 0, displayValue: "₹0", count: 0 },
+  { stage: "Closed Won", value: 0, displayValue: "₹0", count: 0 },
 ];
 
 interface PipelinePerformanceProps {
@@ -24,9 +24,10 @@ interface PipelinePerformanceProps {
 
 export const PipelinePerformance: React.FC<PipelinePerformanceProps> = ({
   initialStages,
-  maxValue = 420,
+  maxValue,
 }) => {
-  const stageData = initialStages || stages;
+  const stageData = initialStages && initialStages.length > 0 ? initialStages : defaultStages;
+  const maxVal = maxValue || Math.max(...stageData.map((s) => s.value), 100);
   return (
     <div className="bg-white border border-[#E5E7EB] rounded-lg p-space-base shadow-[0px_1px_2px_rgba(15,23,42,0.04)]">
       {/* Header */}
@@ -59,7 +60,7 @@ export const PipelinePerformance: React.FC<PipelinePerformanceProps> = ({
       {/* Horizontal Minimalist Bars */}
       <div className="space-y-3.5">
         {stageData.map((s) => {
-          const percentage = Math.round((s.value / maxValue) * 100);
+          const percentage = Math.min(100, Math.round((s.value / maxVal) * 100));
           const isWon = s.stage === "Closed Won";
 
           return (

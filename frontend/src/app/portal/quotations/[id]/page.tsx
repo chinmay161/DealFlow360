@@ -175,6 +175,7 @@ export default async function PortalQuotationDetailPage({ params }: PortalQuotat
           quotationNumber={quote.quotationNumber}
           currentStatus={quote.status}
           negotiations={quote.negotiations}
+          defaultSignatory={quote.primaryContact}
         />
       </main>
     </div>

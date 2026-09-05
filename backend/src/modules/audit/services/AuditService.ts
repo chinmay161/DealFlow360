@@ -9,9 +9,9 @@
  * - Structured Pino logging with action, entity, entityId, requestId, and duration.
  */
 
-import type { PrismaClient, AuditAction } from "@prisma/client";
+import type { PrismaClient } from "@prisma/client";
 import type { IAuditService } from "../interfaces/interfaces.js";
-import type { LogAuditParams, AuditRecordDomain } from "../types/types.js";
+import type { LogAuditParams, AuditRecordDomain, AuditAction } from "../types/types.js";
 import { createModuleLogger } from "../../../lib/logger.js";
 
 const log = createModuleLogger("audit-service");

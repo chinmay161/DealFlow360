@@ -26,6 +26,7 @@ interface InvoicesPageProps {
   initialData?: {
     invoices: Invoice[];
     invoiceStats: any[];
+    lineItems?: InvoiceLineItem[];
   };
 }
 
@@ -45,7 +46,8 @@ export function InvoicesPage({ initialData }: InvoicesPageProps) {
   const [dialog, setDialog] = useState<"payment" | "credit" | "preview" | "export" | null>(null);
 
   const selectedInvoice = invoices.find((invoice) => invoice.id === selectedId) ?? invoices[0];
-  const selectedLineItems = invoiceLineItems.filter((item) => item.invoiceId === selectedInvoice.id);
+  const allLineItems = initialData?.lineItems && initialData.lineItems.length > 0 ? initialData.lineItems : invoiceLineItems;
+  const selectedLineItems = allLineItems.filter((item) => item.invoiceId === selectedInvoice.id);
   const selectedCredits = creditNotes.filter((note) => note.invoiceId === selectedInvoice.id);
 
   const visibleInvoices = useMemo(() => {

@@ -41,7 +41,7 @@ describe("ApprovalRuleService", () => {
           data: expect.objectContaining({
             entity: "ApprovalRule",
             action: "CREATE",
-            userId: "user-admin-1",
+            actorId: "user-admin-1",
           }),
         }),
       );

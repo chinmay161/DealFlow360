@@ -69,13 +69,6 @@ export class AuditQueryService implements IAuditQueryService {
     const [records, totalCount] = await Promise.all([
       this.prisma.auditLog.findMany({
         where,
-        include: {
-          user: {
-            include: {
-              role: true,
-            },
-          },
-        },
         orderBy: {
           createdAt: "desc",
         },
@@ -126,13 +119,6 @@ export class AuditQueryService implements IAuditQueryService {
           mode: "insensitive",
         },
         entityId,
-      },
-      include: {
-        user: {
-          include: {
-            role: true,
-          },
-        },
       },
       orderBy: {
         createdAt: "asc", // Chronological progression

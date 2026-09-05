@@ -8,11 +8,8 @@
 
 import type { Request, Response, NextFunction } from "express";
 
-export interface AuthenticatedUser {
-  id: string;
-  role: string;
-  email?: string;
-}
+import type { AuthenticatedUser } from "../../../types/auth.js";
+export type { AuthenticatedUser };
 
 /**
  * Extract authenticated user context from request or headers.

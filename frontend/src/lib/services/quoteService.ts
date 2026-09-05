@@ -86,9 +86,7 @@ export async function recalculateQuoteTotalsAndRisk(
     lines: riskLines,
   });
 
-  // Preserve canonical Q-1042 exact seeded target if no lines were altered
-  const isQ1042 = quote.quotationNumber === "Q-1042" && quote.lineItems.length === 3;
-  const finalRiskScore = isQ1042 ? (quote.riskScore ?? 72) : risk.riskScore;
+  const finalRiskScore = risk.riskScore;
   const finalStage = quote.status === "IN_REVIEW" ? (quote.currentStage || "Finance Review") : risk.requiredStage;
 
   const updated = await db.quotation.update({

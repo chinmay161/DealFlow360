@@ -823,3 +823,40 @@ model VerificationToken {
 
   @@id([identifier, token])
 }
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Configuration & Commercial Policy Rules
+// ──────────────────────────────────────────────────────────────────────────────
+
+model DiscountPolicy {
+  id              String        @id @default(uuid())
+  name            String        @unique
+  description     String?
+  type            String        @default("PERCENTAGE")
+  value           Decimal       @db.Decimal(14, 2)
+  minOrderAmt     Decimal?      @db.Decimal(14, 2)
+  maxDiscount     Decimal?      @db.Decimal(14, 2)
+  tier            CustomerTier?
+  isActive        Boolean       @default(true)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([tier])
+  @@index([isActive])
+}
+
+model ApprovalRule {
+  id            String   @id @default(uuid())
+  name          String   @unique
+  description   String?
+  stage         Int      @default(1)
+  threshold     Decimal  @db.Decimal(14, 2)
+  approverRole  String   @default("MANAGER")
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([stage])
+  @@index([isActive])
+}
+
