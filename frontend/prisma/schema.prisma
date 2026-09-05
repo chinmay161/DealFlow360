@@ -163,21 +163,37 @@ model Customer {
 }
 
 model Contact {
-  id           String    @id @default(uuid())
-  customerId   String
-  customer     Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  userId       String?   @unique
-  user         User?     @relation(fields: [userId], references: [id])
-  name         String
-  email        String
-  phone        String?
-  title        String?
-  isPrimary    Boolean   @default(false)
-  portalAccess Boolean   @default(false)
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  id                  String    @id @default(uuid())
+  customerId          String
+  customer            Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  userId              String?   @unique
+  user                User?     @relation(fields: [userId], references: [id])
+  name                String
+  email               String    @unique
+  phone               String?
+  title               String?
+  isPrimary           Boolean   @default(false)
+  portalAccess        Boolean   @default(false)
+  portalAccessEnabled Boolean   @default(false)
+  isActive            Boolean   @default(true)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
   @@index([customerId])
+  @@index([email])
+}
+
+model PortalLoginIntent {
+  id         String    @id @default(uuid())
+  token      String    @unique
+  email      String
+  contactId  String
+  customerId String
+  expiresAt  DateTime
+  usedAt     DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([token])
   @@index([email])
 }
 

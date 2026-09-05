@@ -39,35 +39,18 @@ export interface SanitizedCustomerQuote {
   }>;
 }
 
-export async function getCustomerQuotations(customerIdentifier?: string) {
-  let customer = null;
-  if (customerIdentifier) {
-    const searchKeyword = customerIdentifier.split(" ")[0] || customerIdentifier;
-    customer = await prisma.customer.findFirst({
-      where: {
-        OR: [
-          { name: { contains: searchKeyword, mode: "insensitive" } },
-          { customerNumber: customerIdentifier },
-          { id: customerIdentifier },
-        ],
-      },
-      include: { contacts: true },
-    });
-  }
+export async function getCustomerQuotations(customerId: string) {
+  if (!customerId) return [];
 
-  if (!customer) {
-    customer =
-      (await prisma.customer.findFirst({
-        where: { quotations: { some: {} } },
-        include: { contacts: true },
-      })) ||
-      (await prisma.customer.findFirst({
-        include: { contacts: true },
-      }));
-  }
+  const customer = await prisma.customer.findUnique({
+    where: { id: customerId },
+    include: { contacts: true },
+  });
+
+  if (!customer) return [];
 
   const quotes = await prisma.quotation.findMany({
-    where: customer ? { customerId: customer.id } : {},
+    where: { customerId: customer.id },
     include: {
       customer: { include: { contacts: true } },
       lineItems: { include: { product: true } },
@@ -79,10 +62,16 @@ export async function getCustomerQuotations(customerIdentifier?: string) {
   return quotes.map((q) => sanitizeQuotationForCustomer(q));
 }
 
-export async function getCustomerQuotationDetail(identifier: string) {
+export async function getCustomerQuotationDetail(
+  identifier: string,
+  customerId?: string
+) {
+  if (!identifier) return null;
+
   const quote = await prisma.quotation.findFirst({
     where: {
       OR: [{ quotationNumber: identifier }, { id: identifier }],
+      ...(customerId ? { customerId } : {}),
     },
     include: {
       customer: { include: { contacts: true } },

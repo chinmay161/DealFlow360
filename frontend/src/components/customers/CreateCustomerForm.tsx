@@ -52,6 +52,7 @@ export const CreateCustomerForm: React.FC<CreateCustomerFormProps> = ({
   const [contactEmail, setContactEmail] = useState("");
   const [phoneDigits, setPhoneDigits] = useState("");
   const [contactTitle, setContactTitle] = useState("Head of Procurement");
+  const [portalAccessEnabled, setPortalAccessEnabled] = useState(true);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -73,10 +74,10 @@ export const CreateCustomerForm: React.FC<CreateCustomerFormProps> = ({
       return;
     }
 
-    // Validate mobile number: numerical only, exactly 10 digits if provided
+    // Validate mobile number: mandatory, numerical only, exactly 10 digits
     const cleanDigits = phoneDigits.replace(/\D/g, "");
-    if (cleanDigits.length > 0 && cleanDigits.length !== 10) {
-      setErrorMsg("Mobile phone number must be exactly 10 numerical digits.");
+    if (cleanDigits.length !== 10) {
+      setErrorMsg("Mobile phone number is mandatory and must be exactly 10 numerical digits.");
       return;
     }
 
@@ -96,8 +97,9 @@ export const CreateCustomerForm: React.FC<CreateCustomerFormProps> = ({
         country,
         contactName: contactName.trim(),
         contactEmail: contactEmail.trim(),
-        contactPhone: cleanDigits.length === 10 ? `+91 ${cleanDigits}` : null,
+        contactPhone: `+91 ${cleanDigits}`,
         contactTitle: contactTitle.trim() || null,
+        portalAccessEnabled,
       });
 
       if (res.success && res.customer) {
@@ -428,6 +430,23 @@ export const CreateCustomerForm: React.FC<CreateCustomerFormProps> = ({
                   placeholder="e.g. VP Procurement"
                   className="w-full h-10 px-3 rounded-md bg-white border border-[#D1D5DB] text-on-surface text-xs focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
                 />
+              </div>
+
+              <div className="md:col-span-2 pt-2 border-t border-[#F1F5F9]">
+                <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={portalAccessEnabled}
+                    onChange={(e) => setPortalAccessEnabled(e.target.checked)}
+                    className="w-4 h-4 rounded text-primary focus:ring-primary border-slate-300"
+                  />
+                  <span className="text-xs font-semibold text-on-surface">
+                    Enable DealFlow360 Customer Portal Access for this Primary Contact
+                  </span>
+                </label>
+                <p className="text-[11px] text-outline mt-1 pl-6">
+                  When enabled, this customer contact will be eligible to authenticate through the customer login gate and review quotations.
+                </p>
               </div>
             </div>
           </div>

@@ -31,28 +31,19 @@ export const ApprovalsPageHeader: React.FC<ApprovalsPageHeaderProps> = ({
 
         <div className="h-4 w-px bg-[#E5E7EB]"></div>
 
-        {/* Filter / Action controls */}
-        <div className="flex items-center gap-1.5">
-          <button
-            className="h-8 px-2.5 rounded-md border border-[#D1D5DB] bg-white text-on-surface font-label-md text-label-md hover:bg-[#F9FAFB] flex items-center gap-1 text-on-surface-variant transition-colors shadow-sm"
-            title="Refresh Queue"
-          >
-            <span className="material-symbols-outlined text-sm text-outline" data-icon="refresh">
-              refresh
-            </span>
-            <span>Refresh</span>
-          </button>
-          <button
-            className="h-8 px-2.5 rounded-md border border-[#D1D5DB] bg-white text-on-surface font-label-md text-label-md hover:bg-[#F9FAFB] flex items-center gap-1 text-on-surface-variant transition-colors shadow-sm"
-            title="Export Approvals"
-          >
-            <span className="material-symbols-outlined text-sm text-outline" data-icon="file_download">
-              file_download
-            </span>
-            <span>Export</span>
-          </button>
-        </div>
+        {/* Action control: Refresh only */}
+        <button
+          onClick={() => window.location.reload()}
+          className="h-8 px-2.5 rounded-md border border-[#D1D5DB] bg-white text-on-surface font-label-md text-label-md hover:bg-[#F9FAFB] flex items-center gap-1 text-on-surface-variant transition-colors shadow-sm cursor-pointer"
+          title="Refresh Queue"
+        >
+          <span className="material-symbols-outlined text-sm text-outline" data-icon="refresh">
+            refresh
+          </span>
+          <span>Refresh</span>
+        </button>
       </div>
     </div>
   );
 };
+

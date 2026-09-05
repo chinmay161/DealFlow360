@@ -39,7 +39,16 @@ export default async function CustomersPage() {
     quotationCount: c.quotations.length,
     primaryContact: (() => {
       const cnt = c.contacts.find((cn) => cn.isPrimary) || c.contacts[0];
-      return cnt ? { name: cnt.name, title: cnt.title, email: cnt.email } : null;
+      return cnt
+        ? {
+            id: cnt.id,
+            name: cnt.name,
+            title: cnt.title,
+            email: cnt.email,
+            portalAccess: Boolean(cnt.portalAccess || cnt.portalAccessEnabled),
+            isActive: cnt.isActive,
+          }
+        : null;
     })(),
   }));
 

@@ -19,16 +19,16 @@ export const CreateCustomerSchema = z.object({
   contactName: z.string().min(2, "Primary contact name must be at least 2 characters"),
   contactEmail: z
     .string()
+    .trim()
     .regex(
       /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/,
       "Business email must contain '@' and a valid domain extension (e.g. name@company.com)"
     ),
   contactPhone: z
     .string()
-    .regex(/^\+91\s?\d{10}$/, "Mobile number must be a 10-digit number with +91 prefix")
-    .optional()
-    .nullable(),
+    .regex(/^\+91\s?\d{10}$/, "Mobile number must be a 10-digit number with +91 prefix"),
   contactTitle: z.string().max(100).optional().nullable(),
+  portalAccessEnabled: z.boolean().default(true),
 });
 
 export type CreateCustomerInput = z.infer<typeof CreateCustomerSchema>;

@@ -1,11 +1,9 @@
 "use client";
 
 import React, { useState } from "react";
-import Link from "next/link";
 
 export const OverviewHeader: React.FC = () => {
   const [timeRange, setTimeRange] = useState("September 2026");
-
 
   return (
     <div className="flex items-center justify-between pb-space-xs">
@@ -18,7 +16,7 @@ export const OverviewHeader: React.FC = () => {
         </p>
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center">
         {/* Date/Month Selector */}
         <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white border border-[#D1D5DB] text-label-sm text-[#475569] shadow-sm">
           <span className="material-symbols-outlined text-xs text-outline" data-icon="calendar_today">
@@ -36,17 +34,6 @@ export const OverviewHeader: React.FC = () => {
             <option value="YTD 2026">YTD 2026 (FY26)</option>
           </select>
         </div>
-
-        {/* Primary CTA: Create Quotation */}
-        <Link
-          href="/quotations/new"
-          className="h-8 px-3 rounded-md bg-primary hover:bg-[#1E3A8A] text-on-primary font-label-md text-label-md font-semibold flex items-center gap-1.5 transition-colors shadow-sm"
-        >
-          <span className="material-symbols-outlined text-sm" data-icon="add_circle">
-            add_circle
-          </span>
-          <span>Create Quotation</span>
-        </Link>
       </div>
     </div>
   );

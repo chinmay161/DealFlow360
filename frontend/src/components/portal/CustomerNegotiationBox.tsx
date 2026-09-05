@@ -2,21 +2,22 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { submitCounterOfferAction, acceptQuotationAction } from "@/lib/actions/portalActions";
-
-interface NegotiationItem {
-  id: string;
-  proposedDiscount?: number | null;
-  comments: string;
-  status: string;
-  createdAt: string;
-}
+import {
+  submitCounterOffer,
+  acceptQuotationByCustomer,
+} from "@/lib/services/portalService";
 
 interface CustomerNegotiationBoxProps {
   quotationId: string;
   quotationNumber: string;
   currentStatus: string;
-  negotiations: NegotiationItem[];
+  negotiations?: Array<{
+    id: string;
+    proposedDiscount?: number | null;
+    comments: string;
+    status: string;
+    createdAt: string;
+  }>;
   defaultSignatory?: {
     name: string;
     title?: string | null;
@@ -28,18 +29,21 @@ export const CustomerNegotiationBox: React.FC<CustomerNegotiationBoxProps> = ({
   quotationId,
   quotationNumber,
   currentStatus,
-  negotiations,
+  negotiations = [],
   defaultSignatory,
 }) => {
   const router = useRouter();
+
   const [commentText, setCommentText] = useState("");
   const [targetDiscount, setTargetDiscount] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isSigning, setIsSigning] = useState(false);
   const [isSignModalOpen, setIsSignModalOpen] = useState(false);
-  const [signatoryName, setSignatoryName] = useState(defaultSignatory?.name || "Procurement Officer");
-  const [signatoryTitle, setSignatoryTitle] = useState(defaultSignatory?.title || "Commercial Buyer");
-  const [signatoryEmail, setSignatoryEmail] = useState(defaultSignatory?.email || "procurement@commercial.in");
+
+  // Signatory form states
+  const [signatoryName, setSignatoryName] = useState(defaultSignatory?.name || "");
+  const [signatoryTitle, setSignatoryTitle] = useState(defaultSignatory?.title || "Director of Procurement");
+  const [signatoryEmail, setSignatoryEmail] = useState(defaultSignatory?.email || "");
+  const [isSigning, setIsSigning] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const isAccepted = currentStatus === "ACCEPTED";
@@ -50,55 +54,59 @@ export const CustomerNegotiationBox: React.FC<CustomerNegotiationBoxProps> = ({
 
     setIsSubmitting(true);
     try {
-      await submitCounterOfferAction({
+      await submitCounterOffer({
         quotationId,
-        comments: commentText,
+        comments: commentText.trim(),
         proposedDiscount: targetDiscount ? parseFloat(targetDiscount) : undefined,
-        actorName: signatoryName,
+        actorName: defaultSignatory?.name || "Customer Representative",
       });
-
       setCommentText("");
       setTargetDiscount("");
-      setSuccessMessage("Counter-offer submitted to the DealFlow360 sales & finance committee for review!");
-      setTimeout(() => setSuccessMessage(null), 5000);
+      setSuccessMessage("Counter-offer submitted to account executive.");
       router.refresh();
     } catch (err) {
-      console.error("Failed to submit counter offer:", err);
+      console.error("Error submitting counter offer:", err);
+      alert("Failed to submit counter-offer. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const handleSignAndAccept = async () => {
+    if (!signatoryName.trim() || !signatoryEmail.trim()) {
+      alert("Please provide signatory name and corporate email.");
+      return;
+    }
+
     setIsSigning(true);
     try {
-      await acceptQuotationAction({
+      await acceptQuotationByCustomer({
         quotationId,
-        signatoryName,
-        signatoryTitle,
-        signatoryEmail,
+        signatoryName: signatoryName.trim(),
+        signatoryTitle: signatoryTitle.trim(),
+        signatoryEmail: signatoryEmail.trim(),
       });
-
       setIsSignModalOpen(false);
-      setSuccessMessage("Quotation accepted & signed! Fulfillment and initial invoice have been dispatched.");
-      setTimeout(() => setSuccessMessage(null), 6000);
+      setSuccessMessage("Proposal accepted and digitally signed successfully!");
       router.refresh();
     } catch (err) {
-      console.error("Failed to sign and accept quotation:", err);
+      console.error("Error accepting quote:", err);
+      alert("Failed to record signature. Please try again.");
     } finally {
       setIsSigning(false);
     }
   };
 
   return (
-    <div className="bg-white border border-[#E5E7EB] rounded-xl p-6 shadow-sm space-y-6">
-      <div className="flex items-center justify-between pb-4 border-b border-[#E5E7EB]">
+    <div className="bg-white rounded-xl border border-[#E5E7EB] p-6 shadow-xs space-y-6">
+      {/* Box Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#E5E7EB] pb-4">
         <div>
           <h3 className="font-title-md text-base font-bold text-on-surface">
-            Commercial Collaboration &amp; Formal Acceptance
+            Commercial Agreement &amp; Negotiation
           </h3>
           <p className="text-body-sm text-xs text-outline mt-0.5">
-            Discuss terms, request price concessions, or sign and execute the agreement.
+            Accept standard commercial terms or submit a concession request directly to the account team.
           </p>
         </div>
 
@@ -106,7 +114,7 @@ export const CustomerNegotiationBox: React.FC<CustomerNegotiationBoxProps> = ({
           <button
             type="button"
             onClick={() => setIsSignModalOpen(true)}
-            className="px-5 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-label-md text-xs font-bold transition-colors shadow-sm flex items-center gap-2"
+            className="px-5 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-colors shadow-sm flex items-center gap-2 cursor-pointer"
           >
             <span className="material-symbols-outlined text-sm" data-icon="draw">
               draw
@@ -193,7 +201,7 @@ export const CustomerNegotiationBox: React.FC<CustomerNegotiationBoxProps> = ({
             <button
               type="submit"
               disabled={isSubmitting || !commentText.trim()}
-              className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-900 text-white font-label-md text-xs font-semibold transition-colors disabled:opacity-50"
+              className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold transition-colors disabled:opacity-50 cursor-pointer"
             >
               {isSubmitting ? "Submitting..." : "Send to Account Executive"}
             </button>
@@ -271,7 +279,7 @@ export const CustomerNegotiationBox: React.FC<CustomerNegotiationBoxProps> = ({
               <button
                 type="button"
                 onClick={() => setIsSignModalOpen(false)}
-                className="px-3 py-1.5 border rounded-md text-xs font-semibold text-on-surface"
+                className="px-3 py-1.5 border rounded-md text-xs font-semibold text-on-surface cursor-pointer"
               >
                 Cancel
               </button>
@@ -279,7 +287,7 @@ export const CustomerNegotiationBox: React.FC<CustomerNegotiationBoxProps> = ({
                 type="button"
                 disabled={isSigning}
                 onClick={handleSignAndAccept}
-                className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-xs font-bold transition-colors disabled:opacity-50"
+                className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-xs font-bold transition-colors disabled:opacity-50 cursor-pointer"
               >
                 {isSigning ? "Recording Signature..." : "Confirm & Execute Order"}
               </button>
