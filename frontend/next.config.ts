@@ -9,6 +9,7 @@ loadEnvConfig(rootDir);
 const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:5000";
 
 const nextConfig: NextConfig = {
+  outputFileTracingRoot: path.resolve(__dirname, ".."),
   async rewrites() {
     return [
       {
@@ -18,5 +19,6 @@ const nextConfig: NextConfig = {
     ];
   },
 };
+
 
 export default nextConfig;
