@@ -75,9 +75,28 @@ export interface ReservationRecord {
   productName: string;
   sku: string;
   quantity: number;
+  remainingInventory?: number;
+  reservationDate?: string;
+  expiryDate?: string;
   status: ReservationStatusType;
   createdAt: string;
   updatedAt: string;
+}
+
+export type FulfillmentTimelineStage =
+  | "Quotation Approved"
+  | "Inventory Reserved"
+  | "Packed"
+  | "Dispatched"
+  | "In Transit"
+  | "Delivered";
+
+export interface VerticalTimelineStep {
+  stage: FulfillmentTimelineStage;
+  label: string;
+  description?: string;
+  timestamp?: string | null;
+  status: "completed" | "current" | "pending" | "cancelled";
 }
 
 export interface ShipmentTimelineMilestone {
@@ -103,6 +122,7 @@ export interface ShipmentRecord {
   trackingCode?: string | null;
   status: ShipmentStatusType;
   reservedQuantity: number;
+  estimatedDelivery?: string;
   shippedAt?: string | null;
   deliveredAt?: string | null;
   createdAt: string;
@@ -113,6 +133,7 @@ export interface ShipmentRecord {
     quantity: number;
   }[];
   timeline: ShipmentTimelineMilestone[];
+  verticalTimeline?: VerticalTimelineStep[];
 }
 
 export interface InventoryKPIs {
