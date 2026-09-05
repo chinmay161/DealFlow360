@@ -17,46 +17,6 @@ export function isAllowedEmailDomain(email?: string | null): boolean {
   return ALLOWED_DOMAINS.includes(domain as (typeof ALLOWED_DOMAINS)[number]);
 }
 
-function safeMaskClientId(id?: string): string {
-  if (!id) return "(none)";
-  if (id.length < 25) return `(length=${id.length})`;
-  return `${id.slice(0, 12)}...${id.slice(-18)} (length=${id.length})`;
-}
-
-// SAFE temporary diagnostic for debugging Auth.js environment & credentials
-if (typeof process !== "undefined" && process.env) {
-  const gId = process.env.GOOGLE_CLIENT_ID;
-  const gSecret = process.env.GOOGLE_CLIENT_SECRET;
-  const aId = process.env.AUTH_GOOGLE_ID;
-  const aSecret = process.env.AUTH_GOOGLE_SECRET;
-  const authSec = process.env.AUTH_SECRET;
-
-  console.log("[Auth.js Safe Diagnostic]", {
-    GOOGLE_CLIENT_ID: {
-      present: !!gId,
-      length: gId?.length ?? 0,
-      masked: safeMaskClientId(gId),
-      startsWithQuote: gId?.startsWith('"') || gId?.startsWith("'") || false,
-    },
-    GOOGLE_CLIENT_SECRET: {
-      present: !!gSecret,
-      length: gSecret?.length ?? 0,
-    },
-    AUTH_GOOGLE_ID: {
-      present: !!aId,
-      length: aId?.length ?? 0,
-    },
-    AUTH_GOOGLE_SECRET: {
-      present: !!aSecret,
-      length: aSecret?.length ?? 0,
-    },
-    AUTH_SECRET: {
-      present: !!authSec,
-      length: authSec?.length ?? 0,
-    },
-  });
-}
-
 export const authConfig: NextAuthConfig = {
   trustHost: true,
   pages: {

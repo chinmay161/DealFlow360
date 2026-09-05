@@ -3,37 +3,43 @@ import Link from "next/link";
 import { AppSidebar } from "@/components/AppSidebar";
 import { TopHeader } from "@/components/TopHeader";
 import { QuotationDetailView } from "@/components/quotations/QuotationDetailView";
-import { getQuotationByNumber } from "@/lib/quotations";
+import { getQuotationWithLineItems } from "@/lib/quotations";
 
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = {
-  title: "DealFlow360 - Quotations | Q-1042",
-  description: "Enterprise Commerce Quotation Builder connected to PostgreSQL",
-};
+interface QuotationDetailPageProps {
+  params: Promise<{ id: string }>;
+}
 
-export default async function QuotationBuilderPage() {
+export async function generateMetadata({
+  params,
+}: QuotationDetailPageProps): Promise<Metadata> {
+  const { id } = await params;
+  return {
+    title: `DealFlow360 - Quotation | ${decodeURIComponent(id).toUpperCase()}`,
+    description: `Enterprise Commerce Quotation ${decodeURIComponent(id).toUpperCase()} connected to PostgreSQL`,
+  };
+}
+
+export default async function QuotationDetailPage({ params }: QuotationDetailPageProps) {
+  const { id } = await params;
+  const decodedId = decodeURIComponent(id);
+
   let quotation = null;
   let errorMessage: string | null = null;
 
   try {
-    quotation = await getQuotationByNumber("Q-1042");
+    quotation = await getQuotationWithLineItems(decodedId);
   } catch (error) {
-    console.error("[QuotationBuilderPage] Error loading canonical Q-1042:", error);
+    console.error(`[QuotationDetailPage] Error loading quotation ${decodedId}:`, error);
     errorMessage = "Unable to load quotations.";
   }
 
   return (
     <>
-      {/* LEFT PERSISTENT SIDEBAR (260px) */}
       <AppSidebar />
-
-      {/* MAIN VIEWPORT CONTAINER */}
       <div className="flex-1 h-screen flex flex-col overflow-hidden">
-        {/* TOP APP BAR */}
         <TopHeader />
-
-        {/* CONTENT BODY */}
         {!quotation || errorMessage ? (
           <main className="flex-1 flex flex-col items-center justify-center bg-background p-8">
             <div className="bg-white border border-[#E5E7EB] rounded-lg p-8 max-w-md text-center shadow-sm">
@@ -47,7 +53,7 @@ export default async function QuotationBuilderPage() {
                 {errorMessage || "No quotations found."}
               </h2>
               <p className="text-body-sm text-outline mt-1 mb-4">
-                Canonical quotation Q-1042 could not be loaded from PostgreSQL.
+                Quotation #{decodedId} could not be found in PostgreSQL.
               </p>
               <Link
                 href="/quotations?view=list"
