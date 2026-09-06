@@ -93,7 +93,7 @@ export async function getCurrentUser(): Promise<CurrentUserData | null> {
     role: dbUser.role,
     roleDisplay: getRoleDisplay(dbUser.role, dbUser.title),
     title: dbUser.title,
-    department: dbUser.department || (dbUser.role === "APPROVER" ? "Commercial Approvals" : "Commercial Sales"),
+    department: dbUser.department || (dbUser.role === "APPROVER" ? "Commercial Approvals" : dbUser.role === "MANAGER" ? "Commercial Management" : "Commercial Sales"),
     territory: dbUser.territory || "Enterprise Commercial Region",
     preferences,
     customerId: (session.user as any)?.customerId || null,

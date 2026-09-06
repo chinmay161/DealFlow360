@@ -42,6 +42,8 @@ export function getRoleDisplay(role?: string | null, title?: string | null): str
   switch (role) {
     case "ADMIN":
       return "Administrator";
+    case "MANAGER":
+      return "Sales Manager";
     case "APPROVER":
       return "Commercial Approver";
     case "SALES_REP":

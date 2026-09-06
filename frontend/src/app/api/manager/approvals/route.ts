@@ -2,11 +2,21 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { formatCurrency } from "@/lib/currency";
 import type { ApprovalItem } from "@/app/(manager)/types/manager.types";
+import { auth } from "@/auth";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   try {
+    const session = await auth();
+    if (!session?.user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const userRole = (session.user as any)?.role;
+    if (userRole !== "MANAGER" && userRole !== "ADMIN") {
+      return NextResponse.json({ error: "Forbidden: Manager authorization required" }, { status: 403 });
+    }
     const { searchParams } = new URL(req.url);
     const search = searchParams.get("search")?.toLowerCase();
     const riskFilter = searchParams.get("risk");

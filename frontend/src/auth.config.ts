@@ -144,9 +144,9 @@ export const authConfig: NextAuthConfig = {
         return true;
       }
 
-      // If manager accesses root or sales dashboard, redirect to manager dashboard
+      // If manager accesses root, sales dashboard, or overview, redirect to manager dashboard
       if (isLoggedIn && (auth?.user as any)?.role === "MANAGER") {
-        if (pathname === "/" || pathname === "/dashboard") {
+        if (pathname === "/" || pathname === "/dashboard" || pathname === "/overview") {
           return Response.redirect(new URL("/manager/dashboard", nextUrl));
         }
       }

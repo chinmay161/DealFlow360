@@ -8,6 +8,8 @@ import { OverviewCommercialActivity } from "@/components/overview/OverviewCommer
 import { OverviewOperationalSnapshot } from "@/components/overview/OverviewOperationalSnapshot";
 import { OverviewActivityFeed } from "@/components/overview/OverviewActivityFeed";
 import { getOverviewMetrics } from "@/lib/services/overviewService";
+import { auth } from "@/auth";
+import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +19,15 @@ export const metadata: Metadata = {
 };
 
 export default async function OverviewPage() {
+  const session = await auth();
+  const userRole = (session?.user as any)?.role;
+  if (userRole === "CUSTOMER") {
+    redirect("/customer/dashboard");
+  }
+  if (userRole === "MANAGER") {
+    redirect("/manager/dashboard");
+  }
+
   let metrics = null;
   let errorMessage: string | null = null;
 

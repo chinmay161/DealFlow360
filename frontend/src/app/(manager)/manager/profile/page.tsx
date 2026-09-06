@@ -60,7 +60,7 @@ export default function ManagerProfilePage() {
             </p>
             <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-1.5">
               <Building className="h-3.5 w-3.5 text-slate-400" />
-              <span>Commercial Operations • Enterprise APAC</span>
+              <span>{user?.department || "Commercial Management"} • {user?.territory || "Western & Northern India Enterprise"}</span>
             </p>
           </div>
         </div>

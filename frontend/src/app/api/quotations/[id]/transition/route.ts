@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { auth } from "@/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -46,8 +47,8 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
       );
     }
 
-    const defaultActor = await prisma.user.findFirst();
-    const actorId = body.actorId || defaultActor?.id || quote.ownerId;
+    const session = await auth();
+    const actorId = body.actorId || session?.user?.id || quote.ownerId;
 
     // 1. Attempt transition via Backend State Machine microservice
     let backendSuccess = false;

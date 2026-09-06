@@ -2,11 +2,23 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { formatCurrency, formatCompactINR } from "@/lib/currency";
 import type { ManagerDashboardData } from "@/app/(manager)/types/manager.types";
+import { auth } from "@/auth";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
+    const session = await auth();
+    if (!session?.user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const userRole = (session.user as any)?.role;
+    if (userRole !== "MANAGER" && userRole !== "ADMIN") {
+      return NextResponse.json({ error: "Forbidden: Manager authorization required" }, { status: 403 });
+    }
+
+    const managerId = session.user.id;
     // 1. Fetch real quotations & approvals from Prisma
     const [quotations, approvals] = await Promise.all([
       prisma.quotation.findMany({

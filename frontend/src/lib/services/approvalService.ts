@@ -33,6 +33,8 @@ export async function submitQuoteForApproval(quotationId: string, notes?: string
 
   // Find approvers
   const salesManager = await prisma.user.findFirst({
+    where: { role: "MANAGER" },
+  }) ?? await prisma.user.findFirst({
     where: { email: "vikram.desai@dealflow360.in" },
   }) ?? await prisma.user.findFirst({ where: { role: "APPROVER" } });
 

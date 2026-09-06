@@ -1,8 +1,10 @@
 "use client";
 
 import React, { useState } from "react";
+import Link from "next/link";
 import { Search, Bell, Menu } from "lucide-react";
 import { NotificationDrawer } from "./NotificationDrawer";
+import { useCurrentUser } from "@/lib/hooks/useCurrentUser";
 
 interface ManagerTopHeaderProps {
   onOpenMobileMenu?: () => void;
@@ -10,6 +12,9 @@ interface ManagerTopHeaderProps {
 
 export const ManagerTopHeader: React.FC<ManagerTopHeaderProps> = ({ onOpenMobileMenu }) => {
   const [notificationOpen, setNotificationOpen] = useState(false);
+  const { user, initials, roleDisplay } = useCurrentUser();
+  const userName = user?.name || "Commercial Manager";
+  const displayRole = user?.title || user?.roleDisplay || roleDisplay;
 
   return (
     <>
@@ -40,7 +45,7 @@ export const ManagerTopHeader: React.FC<ManagerTopHeaderProps> = ({ onOpenMobile
           </div>
         </div>
 
-        {/* Right: Live Sync & Action Bar */}
+        {/* Right: Live Sync, Notifications & Manager Identity */}
         <div className="flex items-center gap-space-base">
           {/* Live Sync Status */}
           <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#ECFDF5] border border-[#A7F3D0]">
@@ -62,6 +67,27 @@ export const ManagerTopHeader: React.FC<ManagerTopHeaderProps> = ({ onOpenMobile
             <Bell className="h-4 w-4 text-slate-600" />
             <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-white"></span>
           </button>
+
+          <div className="h-4 w-px bg-[#E5E7EB] hidden sm:block"></div>
+
+          {/* Authoritative Manager Profile Pill */}
+          <Link
+            href="/manager/profile"
+            className="flex items-center gap-2 p-1 rounded-lg hover:bg-surface-container-low transition-colors duration-150"
+            title={`${userName} • ${displayRole}`}
+          >
+            <div className="w-7 h-7 rounded-full bg-primary text-on-primary flex items-center justify-center text-xs font-bold shrink-0 border border-[#D1D5DB] shadow-xs">
+              {initials}
+            </div>
+            <div className="hidden lg:flex flex-col text-left min-w-0">
+              <span className="text-xs font-semibold text-on-surface leading-tight truncate max-w-[130px]">
+                {userName}
+              </span>
+              <span className="text-[10px] text-outline leading-tight truncate max-w-[130px]">
+                {displayRole}
+              </span>
+            </div>
+          </Link>
         </div>
       </header>
 

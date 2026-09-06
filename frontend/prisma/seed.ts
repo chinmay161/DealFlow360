@@ -142,6 +142,17 @@ async function main() {
       avatarUrl: null,
       createdAt: new Date("2026-09-05T18:37:14Z"),
     },
+    {
+      id: "faaf6a1c-09a9-4474-ab32-462794135ff5",
+      name: "Shivam Mishra",
+      email: "mrshivextra@gmail.com",
+      role: UserRole.MANAGER,
+      title: "Commercial Sales Manager",
+      department: "Commercial Management",
+      territory: "Western & Northern India Enterprise",
+      avatarUrl: "https://lh3.googleusercontent.com/a/ACg8ocLD_0JcLCDtUElFsnRnoEdkxOBnGrQdR7zEjjFtYRkgb-q13g=s96-c",
+      createdAt: new Date("2026-09-06T02:32:28.268Z"),
+    },
   ];
 
   const seededUsers: Record<string, string> = {};
@@ -153,6 +164,9 @@ async function main() {
         name: u.name,
         role: u.role,
         avatarUrl: u.avatarUrl,
+        ...((u as any).title ? { title: (u as any).title } : {}),
+        ...((u as any).department ? { department: (u as any).department } : {}),
+        ...((u as any).territory ? { territory: (u as any).territory } : {}),
       },
       create: {
         id: toUUID(u.id),
@@ -160,6 +174,9 @@ async function main() {
         email: u.email,
         role: u.role,
         avatarUrl: u.avatarUrl,
+        title: (u as any).title ?? null,
+        department: (u as any).department ?? null,
+        territory: (u as any).territory ?? null,
         createdAt: u.createdAt,
       },
     });

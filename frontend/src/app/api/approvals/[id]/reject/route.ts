@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { auth } from "@/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +12,17 @@ interface RouteParams {
 
 export async function POST(req: NextRequest, { params }: RouteParams) {
   try {
+    const session = await auth();
+    if (session?.user) {
+      const role = (session.user as any)?.role;
+      if (role === "CUSTOMER" || role === "SALES_REP") {
+        return NextResponse.json(
+          { error: "Forbidden: You are not authorized to reject quotations" },
+          { status: 403 }
+        );
+      }
+    }
+
     const { id } = await params;
     const body = await req.json().catch(() => ({}));
     const { comments } = body;
