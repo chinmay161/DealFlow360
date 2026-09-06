@@ -23,11 +23,13 @@ export function extractUser(req: Request): AuthenticatedUser | null {
   }
 
   const userId =
+    (req.headers["x-authenticated-user-id"] as string) ??
     (req.headers["x-user-id"] as string) ??
     (req.headers["x-actor-id"] as string);
 
   const role =
-    ((req.headers["x-user-role"] as string) ??
+    ((req.headers["x-authenticated-user-role"] as string) ??
+    (req.headers["x-user-role"] as string) ??
     (req.headers["x-role"] as string) ??
     "").toUpperCase();
 
@@ -35,7 +37,10 @@ export function extractUser(req: Request): AuthenticatedUser | null {
     return {
       id: userId,
       role: role || "ADMIN", // default to ADMIN if role not explicitly restricted in header
-      email: (req.headers["x-user-email"] as string) ?? undefined,
+      email:
+        (req.headers["x-authenticated-user-email"] as string) ??
+        (req.headers["x-user-email"] as string) ??
+        undefined,
     };
   }
 
@@ -90,7 +95,7 @@ export function requireRole(allowedRoles: string[]) {
 
     if (!allowedRoles.includes(userRole)) {
       res.status(403).json({
-        error: `Access denied. Role "${userRole}" lacks sufficient permissions.`,
+        error: `Access denied. Role "${userRole}" lacks sufficient permissions. Only Managers are allowed to modify policies.`,
         code: "FORBIDDEN",
       });
       return;
@@ -101,9 +106,11 @@ export function requireRole(allowedRoles: string[]) {
 }
 
 /**
- * Admin only: create, update, delete.
+ * Managers and Admins only: create, update, delete.
  */
-export const requireAdmin = requireRole(["ADMIN"]);
+export const requireAdmin = requireRole(["ADMIN", "MANAGER"]);
+export const requireManager = requireAdmin;
+export const requireManagerOrAdmin = requireAdmin;
 
 /**
  * Admin, Manager, Sales: view / read-only.

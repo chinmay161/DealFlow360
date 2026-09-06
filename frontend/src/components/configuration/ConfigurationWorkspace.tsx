@@ -5,8 +5,10 @@ import { useRouter } from "next/navigation";
 import {
   createDiscountPolicyAction,
   deleteDiscountPolicyAction,
+  toggleDiscountPolicyAction,
   createApprovalRuleAction,
   deleteApprovalRuleAction,
+  toggleApprovalRuleAction,
 } from "@/lib/actions/configActions";
 
 interface DiscountPolicyItem {
@@ -34,18 +36,30 @@ interface ApprovalRuleItem {
 interface ConfigurationWorkspaceProps {
   initialPolicies: DiscountPolicyItem[];
   initialRules: ApprovalRuleItem[];
+  canManagePolicies?: boolean;
+  userRole?: string;
 }
 
 export const ConfigurationWorkspace: React.FC<ConfigurationWorkspaceProps> = ({
   initialPolicies,
   initialRules,
+  canManagePolicies,
+  userRole,
 }) => {
   const router = useRouter();
+  const isManager = canManagePolicies ?? (userRole === "MANAGER" || userRole === "ADMIN");
+
   const [activeTab, setActiveTab] = useState<"policies" | "rules">("policies");
   const [isPolicyModalOpen, setIsPolicyModalOpen] = useState(false);
   const [isRuleModalOpen, setIsRuleModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Search & Filter state
+  const [policySearch, setPolicySearch] = useState("");
+  const [policyTierFilter, setPolicyTierFilter] = useState("ALL");
+  const [ruleSearch, setRuleSearch] = useState("");
 
   // Policy Form State
   const [policyName, setPolicyName] = useState("");
@@ -63,7 +77,13 @@ export const ConfigurationWorkspace: React.FC<ConfigurationWorkspaceProps> = ({
 
   const handleCreatePolicy = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isManager) {
+      setErrorMsg("403 Forbidden: Only Managers are authorized to create policies.");
+      setTimeout(() => setErrorMsg(null), 4000);
+      return;
+    }
     setIsSaving(true);
+    setErrorMsg(null);
     try {
       await createDiscountPolicyAction({
         name: policyName,
@@ -78,26 +98,59 @@ export const ConfigurationWorkspace: React.FC<ConfigurationWorkspaceProps> = ({
       setFeedback("Discount policy successfully registered.");
       setTimeout(() => setFeedback(null), 3500);
       router.refresh();
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to create policy:", err);
+      setErrorMsg(err?.message || "Failed to create policy.");
+      setTimeout(() => setErrorMsg(null), 4500);
     } finally {
       setIsSaving(false);
     }
   };
 
+  const handleTogglePolicy = async (id: string, nextActive: boolean) => {
+    if (!isManager) {
+      setErrorMsg("403 Forbidden: Only Managers are authorized to modify policies.");
+      setTimeout(() => setErrorMsg(null), 4000);
+      return;
+    }
+    try {
+      await toggleDiscountPolicyAction(id, nextActive);
+      setFeedback(`Discount policy status updated to ${nextActive ? "Active" : "Inactive"}.`);
+      setTimeout(() => setFeedback(null), 3500);
+      router.refresh();
+    } catch (err: any) {
+      console.error("Failed to toggle policy:", err);
+      setErrorMsg(err?.message || "Failed to toggle policy.");
+      setTimeout(() => setErrorMsg(null), 4500);
+    }
+  };
+
   const handleDeletePolicy = async (id: string) => {
+    if (!isManager) {
+      setErrorMsg("403 Forbidden: Only Managers are authorized to delete policies.");
+      setTimeout(() => setErrorMsg(null), 4000);
+      return;
+    }
     if (!confirm("Are you sure you want to remove this discount policy?")) return;
     try {
       await deleteDiscountPolicyAction(id);
       router.refresh();
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to delete policy:", err);
+      setErrorMsg(err?.message || "Failed to delete policy.");
+      setTimeout(() => setErrorMsg(null), 4500);
     }
   };
 
   const handleCreateRule = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isManager) {
+      setErrorMsg("403 Forbidden: Only Managers are authorized to create approval rules.");
+      setTimeout(() => setErrorMsg(null), 4000);
+      return;
+    }
     setIsSaving(true);
+    setErrorMsg(null);
     try {
       await createApprovalRuleAction({
         name: ruleName,
@@ -112,22 +165,70 @@ export const ConfigurationWorkspace: React.FC<ConfigurationWorkspaceProps> = ({
       setFeedback("Approval governance rule successfully configured.");
       setTimeout(() => setFeedback(null), 3500);
       router.refresh();
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to create rule:", err);
+      setErrorMsg(err?.message || "Failed to create approval rule.");
+      setTimeout(() => setErrorMsg(null), 4500);
     } finally {
       setIsSaving(false);
     }
   };
 
+  const handleToggleRule = async (id: string, nextActive: boolean) => {
+    if (!isManager) {
+      setErrorMsg("403 Forbidden: Only Managers are authorized to modify approval rules.");
+      setTimeout(() => setErrorMsg(null), 4000);
+      return;
+    }
+    try {
+      await toggleApprovalRuleAction(id, nextActive);
+      setFeedback(`Approval rule status updated to ${nextActive ? "Active" : "Inactive"}.`);
+      setTimeout(() => setFeedback(null), 3500);
+      router.refresh();
+    } catch (err: any) {
+      console.error("Failed to toggle rule:", err);
+      setErrorMsg(err?.message || "Failed to toggle approval rule.");
+      setTimeout(() => setErrorMsg(null), 4500);
+    }
+  };
+
   const handleDeleteRule = async (id: string) => {
+    if (!isManager) {
+      setErrorMsg("403 Forbidden: Only Managers are authorized to delete approval rules.");
+      setTimeout(() => setErrorMsg(null), 4000);
+      return;
+    }
     if (!confirm("Are you sure you want to remove this approval rule?")) return;
     try {
       await deleteApprovalRuleAction(id);
       router.refresh();
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to delete rule:", err);
+      setErrorMsg(err?.message || "Failed to delete approval rule.");
+      setTimeout(() => setErrorMsg(null), 4500);
     }
   };
+
+  // Filtered lists
+  const filteredPolicies = initialPolicies.filter((p) => {
+    const matchesSearch =
+      !policySearch ||
+      p.name.toLowerCase().includes(policySearch.toLowerCase()) ||
+      (p.description && p.description.toLowerCase().includes(policySearch.toLowerCase()));
+    const matchesTier =
+      policyTierFilter === "ALL" ||
+      (p.tier ? p.tier.toUpperCase() === policyTierFilter : false);
+    return matchesSearch && matchesTier;
+  });
+
+  const filteredRules = initialRules.filter((r) => {
+    const matchesSearch =
+      !ruleSearch ||
+      r.name.toLowerCase().includes(ruleSearch.toLowerCase()) ||
+      r.approverRole.toLowerCase().includes(ruleSearch.toLowerCase()) ||
+      (r.description && r.description.toLowerCase().includes(ruleSearch.toLowerCase()));
+    return matchesSearch;
+  });
 
   return (
     <div className="space-y-6">
@@ -166,22 +267,25 @@ export const ConfigurationWorkspace: React.FC<ConfigurationWorkspaceProps> = ({
             </button>
           </div>
 
-          {activeTab === "policies" ? (
-            <button
-              onClick={() => setIsPolicyModalOpen(true)}
-              className="px-3.5 py-1.5 rounded-lg bg-primary hover:bg-[#1E3A8A] text-white text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-colors"
-            >
-              <span className="material-symbols-outlined text-sm" data-icon="add">add</span>
-              <span>New Policy</span>
-            </button>
-          ) : (
-            <button
-              onClick={() => setIsRuleModalOpen(true)}
-              className="px-3.5 py-1.5 rounded-lg bg-primary hover:bg-[#1E3A8A] text-white text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-colors"
-            >
-              <span className="material-symbols-outlined text-sm" data-icon="add">add</span>
-              <span>New Rule</span>
-            </button>
+          {/* Action buttons: Only rendered for Managers. Hidden for Sales Representatives */}
+          {isManager && (
+            activeTab === "policies" ? (
+              <button
+                onClick={() => setIsPolicyModalOpen(true)}
+                className="px-3.5 py-1.5 rounded-lg bg-primary hover:bg-[#1E3A8A] text-white text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-colors"
+              >
+                <span className="material-symbols-outlined text-sm" data-icon="add">add</span>
+                <span>New Policy</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => setIsRuleModalOpen(true)}
+                className="px-3.5 py-1.5 rounded-lg bg-primary hover:bg-[#1E3A8A] text-white text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-colors"
+              >
+                <span className="material-symbols-outlined text-sm" data-icon="add">add</span>
+                <span>New Rule</span>
+              </button>
+            )
           )}
         </div>
       </div>
@@ -193,16 +297,44 @@ export const ConfigurationWorkspace: React.FC<ConfigurationWorkspaceProps> = ({
         </div>
       )}
 
+      {errorMsg && (
+        <div className="p-3 bg-rose-50 border border-rose-300 rounded-lg text-xs font-semibold text-rose-900 flex items-center gap-2">
+          <span className="material-symbols-outlined text-sm text-rose-700" data-icon="error">error</span>
+          <span>{errorMsg}</span>
+        </div>
+      )}
+
       {/* Tab 1: Discount Policies */}
       {activeTab === "policies" && (
         <div className="bg-white border border-[#E5E7EB] rounded-lg shadow-sm overflow-hidden">
-          <div className="px-5 py-3 border-b border-[#E5E7EB] bg-[#F8FAFC] flex items-center justify-between">
+          <div className="px-5 py-3 border-b border-[#E5E7EB] bg-[#F8FAFC] flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <span className="text-xs font-bold text-on-surface uppercase tracking-wider">
               Active Commercial Discount Policies
             </span>
-            <span className="text-xs text-outline">
-              Canonical Rule Engine Integration
-            </span>
+            <div className="flex items-center gap-2">
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Search policies..."
+                  value={policySearch}
+                  onChange={(e) => setPolicySearch(e.target.value)}
+                  className="pl-7 pr-2.5 py-1 text-xs border border-[#D1D5DB] rounded-md focus:ring-1 focus:ring-primary focus:outline-none bg-white text-on-surface w-44"
+                />
+                <span className="material-symbols-outlined absolute left-1.5 top-1/2 -translate-y-1/2 text-sm text-outline" data-icon="search">
+                  search
+                </span>
+              </div>
+              <select
+                value={policyTierFilter}
+                onChange={(e) => setPolicyTierFilter(e.target.value)}
+                className="px-2 py-1 text-xs border border-[#D1D5DB] rounded-md focus:ring-1 focus:ring-primary focus:outline-none bg-white text-on-surface"
+              >
+                <option value="ALL">All Tiers</option>
+                <option value="GOLD">Gold Tier</option>
+                <option value="SILVER">Silver Tier</option>
+                <option value="BRONZE">Bronze Tier</option>
+              </select>
+            </div>
           </div>
 
           <div className="overflow-x-auto">
@@ -214,18 +346,20 @@ export const ConfigurationWorkspace: React.FC<ConfigurationWorkspaceProps> = ({
                   <th className="py-3 px-4 text-center">Applies To</th>
                   <th className="py-3 px-4 text-right">Max Value / Ceiling</th>
                   <th className="py-3 px-4 text-center">Status</th>
-                  <th className="py-3 px-4 text-right">Actions</th>
+                  <th className="py-3 px-4 text-right">{isManager ? "Actions" : "Access"}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#F1F5F9]">
-                {initialPolicies.length === 0 ? (
+                {filteredPolicies.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="py-12 text-center text-outline">
-                      No discount policies configured. System using standard baseline rules.
+                      {policySearch || policyTierFilter !== "ALL"
+                        ? "No discount policies match your search/filter criteria."
+                        : "No discount policies configured. System using standard baseline rules."}
                     </td>
                   </tr>
                 ) : (
-                  initialPolicies.map((p) => (
+                  filteredPolicies.map((p) => (
                     <tr key={p.id} className="hover:bg-slate-50/70 transition-colors">
                       <td className="py-3.5 px-4">
                         <div className="font-bold text-on-surface text-sm">{p.name}</div>
@@ -243,18 +377,41 @@ export const ConfigurationWorkspace: React.FC<ConfigurationWorkspaceProps> = ({
                         {p.type === "PERCENTAGE" ? `${p.value}%` : `₹${p.value}`}
                       </td>
                       <td className="py-3.5 px-4 text-center">
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
-                          Active
-                        </span>
+                        {/* Status toggle: interactive for Managers, view-only badge for Sales Representatives */}
+                        {isManager ? (
+                          <button
+                            type="button"
+                            onClick={() => handleTogglePolicy(p.id, !p.isActive)}
+                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold transition-opacity hover:opacity-80 cursor-pointer ${
+                              p.isActive ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-600"
+                            }`}
+                            title="Click to toggle status"
+                          >
+                            {p.isActive ? "Active" : "Inactive"}
+                          </button>
+                        ) : (
+                          <span
+                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                              p.isActive ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-600"
+                            }`}
+                          >
+                            {p.isActive ? "Active" : "Inactive"}
+                          </span>
+                        )}
                       </td>
                       <td className="py-3.5 px-4 text-right">
-                        <button
-                          onClick={() => handleDeletePolicy(p.id)}
-                          className="text-rose-600 hover:text-rose-800 p-1 rounded hover:bg-rose-50 transition-colors"
-                          title="Delete Policy"
-                        >
-                          <span className="material-symbols-outlined text-sm" data-icon="delete">delete</span>
-                        </button>
+                        {/* Actions: Delete button for Managers, View-only label for Sales Representatives */}
+                        {isManager ? (
+                          <button
+                            onClick={() => handleDeletePolicy(p.id)}
+                            className="text-rose-600 hover:text-rose-800 p-1 rounded hover:bg-rose-50 transition-colors"
+                            title="Delete Policy"
+                          >
+                            <span className="material-symbols-outlined text-sm" data-icon="delete">delete</span>
+                          </button>
+                        ) : (
+                          <span className="text-[11px] text-outline italic">View only</span>
+                        )}
                       </td>
                     </tr>
                   ))
@@ -268,13 +425,24 @@ export const ConfigurationWorkspace: React.FC<ConfigurationWorkspaceProps> = ({
       {/* Tab 2: Approval Rules */}
       {activeTab === "rules" && (
         <div className="bg-white border border-[#E5E7EB] rounded-lg shadow-sm overflow-hidden">
-          <div className="px-5 py-3 border-b border-[#E5E7EB] bg-[#F8FAFC] flex items-center justify-between">
+          <div className="px-5 py-3 border-b border-[#E5E7EB] bg-[#F8FAFC] flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <span className="text-xs font-bold text-on-surface uppercase tracking-wider">
               Multi-Level Approval Routing Hierarchy
             </span>
-            <span className="text-xs text-outline">
-              Hierarchical Authority Limits
-            </span>
+            <div className="flex items-center gap-2">
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Search rules..."
+                  value={ruleSearch}
+                  onChange={(e) => setRuleSearch(e.target.value)}
+                  className="pl-7 pr-2.5 py-1 text-xs border border-[#D1D5DB] rounded-md focus:ring-1 focus:ring-primary focus:outline-none bg-white text-on-surface w-44"
+                />
+                <span className="material-symbols-outlined absolute left-1.5 top-1/2 -translate-y-1/2 text-sm text-outline" data-icon="search">
+                  search
+                </span>
+              </div>
+            </div>
           </div>
 
           <div className="overflow-x-auto">
@@ -286,18 +454,20 @@ export const ConfigurationWorkspace: React.FC<ConfigurationWorkspaceProps> = ({
                   <th className="py-3 px-4">Approver Role</th>
                   <th className="py-3 px-4 text-right">Discount Threshold</th>
                   <th className="py-3 px-4 text-center">Status</th>
-                  <th className="py-3 px-4 text-right">Actions</th>
+                  <th className="py-3 px-4 text-right">{isManager ? "Actions" : "Access"}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#F1F5F9]">
-                {initialRules.length === 0 ? (
+                {filteredRules.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="py-12 text-center text-outline">
-                      No custom approval rules configured. Using default Sales Manager / Finance / Executive hierarchy.
+                      {ruleSearch
+                        ? "No approval rules match your search criteria."
+                        : "No custom approval rules configured. Using default Sales Manager / Finance / Executive hierarchy."}
                     </td>
                   </tr>
                 ) : (
-                  initialRules.map((r) => (
+                  filteredRules.map((r) => (
                     <tr key={r.id} className="hover:bg-slate-50/70 transition-colors">
                       <td className="py-3.5 px-4 text-center font-bold font-code-tabular text-primary">
                         Stage {r.stage}
@@ -315,18 +485,41 @@ export const ConfigurationWorkspace: React.FC<ConfigurationWorkspaceProps> = ({
                         &gt; {r.threshold}% discount
                       </td>
                       <td className="py-3.5 px-4 text-center">
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
-                          Active
-                        </span>
+                        {/* Status toggle: interactive for Managers, view-only badge for Sales Representatives */}
+                        {isManager ? (
+                          <button
+                            type="button"
+                            onClick={() => handleToggleRule(r.id, !r.isActive)}
+                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold transition-opacity hover:opacity-80 cursor-pointer ${
+                              r.isActive ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-600"
+                            }`}
+                            title="Click to toggle status"
+                          >
+                            {r.isActive ? "Active" : "Inactive"}
+                          </button>
+                        ) : (
+                          <span
+                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                              r.isActive ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-600"
+                            }`}
+                          >
+                            {r.isActive ? "Active" : "Inactive"}
+                          </span>
+                        )}
                       </td>
                       <td className="py-3.5 px-4 text-right">
-                        <button
-                          onClick={() => handleDeleteRule(r.id)}
-                          className="text-rose-600 hover:text-rose-800 p-1 rounded hover:bg-rose-50 transition-colors"
-                          title="Delete Rule"
-                        >
-                          <span className="material-symbols-outlined text-sm" data-icon="delete">delete</span>
-                        </button>
+                        {/* Actions: Delete button for Managers, View-only label for Sales Representatives */}
+                        {isManager ? (
+                          <button
+                            onClick={() => handleDeleteRule(r.id)}
+                            className="text-rose-600 hover:text-rose-800 p-1 rounded hover:bg-rose-50 transition-colors"
+                            title="Delete Rule"
+                          >
+                            <span className="material-symbols-outlined text-sm" data-icon="delete">delete</span>
+                          </button>
+                        ) : (
+                          <span className="text-[11px] text-outline italic">View only</span>
+                        )}
                       </td>
                     </tr>
                   ))
@@ -337,8 +530,8 @@ export const ConfigurationWorkspace: React.FC<ConfigurationWorkspaceProps> = ({
         </div>
       )}
 
-      {/* Modal: New Policy */}
-      {isPolicyModalOpen && (
+      {/* Modal: New Policy (Managers Only) */}
+      {isManager && isPolicyModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
           <div className="bg-white border border-[#E5E7EB] rounded-xl shadow-xl w-full max-w-md overflow-hidden">
             <div className="p-4 border-b border-[#E5E7EB] bg-[#F8FAFC] flex items-center justify-between">
@@ -433,8 +626,8 @@ export const ConfigurationWorkspace: React.FC<ConfigurationWorkspaceProps> = ({
         </div>
       )}
 
-      {/* Modal: New Rule */}
-      {isRuleModalOpen && (
+      {/* Modal: New Rule (Managers Only) */}
+      {isManager && isRuleModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
           <div className="bg-white border border-[#E5E7EB] rounded-xl shadow-xl w-full max-w-md overflow-hidden">
             <div className="p-4 border-b border-[#E5E7EB] bg-[#F8FAFC] flex items-center justify-between">

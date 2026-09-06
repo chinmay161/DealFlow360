@@ -13,24 +13,21 @@ export const metadata: Metadata = {
 };
 
 export default async function ConfigurationPage() {
-  let authContext = {
-    userId: "admin-system",
-    role: "ADMIN",
-    email: "admin@dealflow360.in",
-  };
-
+  let user: any = null;
   try {
-    const user = await getCurrentUser();
-    if (user) {
-      authContext = {
-        userId: user.id || "admin-system",
-        role: "ADMIN",
-        email: user.email || "admin@dealflow360.in",
-      };
-    }
+    user = await getCurrentUser();
   } catch {
     // Non-fatal fallback
   }
+
+  const userRole = (user?.role || "SALES_REP").toUpperCase();
+  const canManagePolicies = userRole === "MANAGER" || userRole === "ADMIN";
+
+  const authContext = {
+    userId: user?.id || "rep-user",
+    role: userRole,
+    email: user?.email || "user@dealflow360.in",
+  };
 
   const [policies, rules] = await Promise.all([
     getDiscountPolicies(authContext),
@@ -77,7 +74,12 @@ export default async function ConfigurationPage() {
               </div>
             </div>
 
-            <ConfigurationWorkspace initialPolicies={sanitizedPolicies} initialRules={sanitizedRules} />
+            <ConfigurationWorkspace
+              initialPolicies={sanitizedPolicies}
+              initialRules={sanitizedRules}
+              canManagePolicies={canManagePolicies}
+              userRole={userRole}
+            />
           </div>
         </main>
       </div>

@@ -169,14 +169,13 @@ describe("Configuration Controllers & Auth Middleware", () => {
       expect(next).toHaveBeenCalled();
     });
 
-    it("blocks Manager from write operations with 403 (requireAdmin)", () => {
+    it("allows Manager to perform write operations (requireAdmin)", () => {
       const req = mockReq({}, {}, {}, {}, { id: "mgr-1", role: "MANAGER" });
       const res = mockRes();
       const next = vi.fn();
 
       requireAdmin(req, res, next);
-      expect(next).not.toHaveBeenCalled();
-      expect(res.status).toHaveBeenCalledWith(403);
+      expect(next).toHaveBeenCalled();
     });
 
     it("blocks Sales user from write operations with 403 (requireAdmin)", () => {
@@ -187,6 +186,9 @@ describe("Configuration Controllers & Auth Middleware", () => {
       requireAdmin(req, res, next);
       expect(next).not.toHaveBeenCalled();
       expect(res.status).toHaveBeenCalledWith(403);
+      expect(res.json).toHaveBeenCalledWith(
+        expect.objectContaining({ code: "FORBIDDEN" }),
+      );
     });
 
     it("allows Manager and Sales users read-only access (requireReadAccess)", () => {
