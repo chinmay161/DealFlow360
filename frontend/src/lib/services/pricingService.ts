@@ -30,22 +30,36 @@ export async function resolveProductPriceForCustomer(
     throw new Error(`Product with ID ${productId} not found`);
   }
 
-  // Determine target price list code by tier
-  let targetPriceListCode = "STD-2026";
-  if (customer?.tier === CustomerTier.PLATINUM) {
-    targetPriceListCode = "ENT-2026";
-  } else if (customer?.tier === CustomerTier.GOLD) {
-    targetPriceListCode = "GOLD-2026";
-  }
+  // Resolve price list dynamically by customer tier from PostgreSQL
+  let priceList = customer?.tier
+    ? await prisma.priceList.findFirst({
+        where: { tier: customer.tier, isActive: true },
+        include: {
+          items: {
+            where: { productId },
+          },
+        },
+      })
+    : null;
 
-  const priceList = await prisma.priceList.findFirst({
-    where: { code: targetPriceListCode, isActive: true },
-    include: {
-      items: {
-        where: { productId },
+  // If no tier-matched list (e.g. PLATINUM without custom list), map to fallback tier code
+  if (!priceList) {
+    let targetPriceListCode = "STD-2026";
+    if (customer?.tier === CustomerTier.PLATINUM) {
+      targetPriceListCode = "ENT-2026";
+    } else if (customer?.tier === CustomerTier.GOLD) {
+      targetPriceListCode = "GOLD-2026";
+    }
+
+    priceList = await prisma.priceList.findFirst({
+      where: { code: targetPriceListCode, isActive: true },
+      include: {
+        items: {
+          where: { productId },
+        },
       },
-    },
-  });
+    });
+  }
 
   const priceItem = priceList?.items[0];
   const rawUnitPrice = priceItem ? Number(priceItem.price) : Number(product.unitPrice);

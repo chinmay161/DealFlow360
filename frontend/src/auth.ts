@@ -50,23 +50,22 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             return "/portal?error=AccessDenied";
           }
 
-          // Ensure User record has CUSTOMER role and is linked to the Contact
+          // Ensure User record exists with CUSTOMER role and is linked to the Contact
           try {
-            const dbUser = await prisma.user.findUnique({
+            const dbUser = await prisma.user.upsert({
               where: { email: normalizedEmail },
+              update: { role: "CUSTOMER" },
+              create: {
+                email: normalizedEmail,
+                name: user?.name || profile?.name || verifyResult.contact.name,
+                image: user?.image || (profile as any)?.picture || null,
+                role: "CUSTOMER",
+              },
             });
-            if (dbUser) {
-              if (dbUser.role !== "CUSTOMER") {
-                await prisma.user.update({
-                  where: { id: dbUser.id },
-                  data: { role: "CUSTOMER" },
-                });
-              }
-              await prisma.contact.update({
-                where: { id: verifyResult.contact.id },
-                data: { userId: dbUser.id },
-              });
-            }
+            await prisma.contact.update({
+              where: { id: verifyResult.contact.id },
+              data: { userId: dbUser.id },
+            });
           } catch (err) {
             console.error("Failed to link customer user:", err);
           }
@@ -101,6 +100,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           session.user.id = token.sub;
         }
         session.user.role = (token.role as string) || "SALES_REP";
+        session.user.title = (token.title as string) || null;
+        session.user.department = (token.department as string) || null;
+        session.user.territory = (token.territory as string) || null;
+        if (token.name) {
+          session.user.name = token.name as string;
+        }
         if (token.customerId) {
           session.user.customerId = token.customerId as string;
         }
@@ -140,11 +145,24 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         try {
           const dbUser = await prisma.user.findUnique({
             where: { email: normalized },
-            select: { role: true, id: true },
+            select: {
+              id: true,
+              role: true,
+              name: true,
+              image: true,
+              title: true,
+              department: true,
+              territory: true,
+            },
           });
           if (dbUser) {
             token.role = dbUser.role;
             token.id = dbUser.id;
+            if (dbUser.name) token.name = dbUser.name;
+            if (dbUser.image) token.picture = dbUser.image;
+            token.title = dbUser.title;
+            token.department = dbUser.department;
+            token.territory = dbUser.territory;
           } else {
             token.role = "SALES_REP";
           }
@@ -154,6 +172,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       } else if (user) {
         token.id = user.id;
         token.role = user.role ?? "SALES_REP";
+        token.title = (user as any).title;
+        token.department = (user as any).department;
+        token.territory = (user as any).territory;
       }
       return token;
     },

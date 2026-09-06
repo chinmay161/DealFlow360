@@ -112,6 +112,10 @@ model User {
   image              String?
   avatarUrl          String?
   role               UserRole               @default(SALES_REP)
+  title              String?
+  department         String?
+  territory          String?
+  preferences        Json?
   createdAt          DateTime               @default(now())
   updatedAt          DateTime               @updatedAt
 

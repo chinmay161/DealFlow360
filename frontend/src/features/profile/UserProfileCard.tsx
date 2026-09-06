@@ -1,14 +1,18 @@
-import React from "react";
+import React, { useState } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { User, Mail, MapPin } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import type { UserProfile } from "@/types/user.types";
+import { getInitials } from "@/lib/utils/userUtils";
 
 interface UserProfileCardProps {
   profile: UserProfile;
 }
 
 export function UserProfileCard({ profile }: UserProfileCardProps) {
+  const [imgError, setImgError] = useState(false);
+  const initials = getInitials(profile.name, profile.email);
+
   return (
     <Card className="rounded-xl border border-slate-200/80 shadow-sm bg-white dark:bg-slate-900/60">
       <CardHeader className="border-b border-slate-100 pb-3 flex flex-row items-center gap-2">
@@ -18,12 +22,17 @@ export function UserProfileCard({ profile }: UserProfileCardProps) {
 
       <CardContent className="pt-5 space-y-4 text-xs">
         <div className="flex items-center gap-4">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-700 text-white flex items-center justify-center font-bold text-lg shadow-md shadow-blue-500/20">
-            {profile.name
-              .split(" ")
-              .map((n) => n[0])
-              .join("")
-              .substring(0, 2)}
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-700 text-white flex items-center justify-center font-bold text-lg shadow-md shadow-blue-500/20 overflow-hidden shrink-0">
+            {profile.avatarUrl && !imgError ? (
+              <img
+                src={profile.avatarUrl}
+                alt={profile.name}
+                className="w-full h-full object-cover"
+                onError={() => setImgError(true)}
+              />
+            ) : (
+              <span>{initials}</span>
+            )}
           </div>
           <div>
             <h3 className="font-bold text-base text-slate-900 dark:text-slate-50">

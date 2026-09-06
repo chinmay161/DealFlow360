@@ -1,10 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { auth } from "@/auth";
+import { getAuthoritativeCustomerForSession } from "@/lib/services/portalAuthService";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   try {
+    const session = await auth();
+    const isCustomer = session?.user?.role === "CUSTOMER";
+    const authCustomer = isCustomer ? await getAuthoritativeCustomerForSession(session?.user) : null;
+
     const { searchParams } = new URL(req.url);
     const query = searchParams.get("q")?.trim();
 
@@ -12,14 +18,21 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ results: [] });
     }
 
-    const [quotations, products, customers] = await Promise.all([
-      prisma.quotation.findMany({
-        where: {
+    const quoteWhere: any = isCustomer && authCustomer
+      ? {
+          customerId: authCustomer.id,
+          quotationNumber: { contains: query, mode: "insensitive" },
+        }
+      : {
           OR: [
             { quotationNumber: { contains: query, mode: "insensitive" } },
             { customer: { name: { contains: query, mode: "insensitive" } } },
           ],
-        },
+        };
+
+    const [quotations, products, customers] = await Promise.all([
+      prisma.quotation.findMany({
+        where: quoteWhere,
         include: { customer: { select: { name: true } } },
         take: 5,
       }),
@@ -32,15 +45,17 @@ export async function GET(req: NextRequest) {
         },
         take: 5,
       }),
-      prisma.customer.findMany({
-        where: {
-          OR: [
-            { name: { contains: query, mode: "insensitive" } },
-            { industry: { contains: query, mode: "insensitive" } },
-          ],
-        },
-        take: 5,
-      }),
+      isCustomer
+        ? Promise.resolve([]) // Never expose other customer organizations to CUSTOMER role
+        : prisma.customer.findMany({
+            where: {
+              OR: [
+                { name: { contains: query, mode: "insensitive" } },
+                { industry: { contains: query, mode: "insensitive" } },
+              ],
+            },
+            take: 5,
+          }),
     ]);
 
     const results: any[] = [];
@@ -52,7 +67,7 @@ export async function GET(req: NextRequest) {
         type: "quotation",
         title: `Quotation #${q.quotationNumber}`,
         subtitle: `${q.customer.name} • ₹${Number(q.totalValue).toLocaleString()} • ${q.status}`,
-        url: `/customer/quotations/${q.quotationNumber}`,
+        url: isCustomer ? `/portal/quotations/${q.id}` : `/quotations/${q.id}`,
         badge: q.status,
       });
     });
@@ -64,22 +79,24 @@ export async function GET(req: NextRequest) {
         type: "product",
         title: p.name,
         subtitle: `SKU: ${p.sku} • ₹${Number(p.unitPrice).toLocaleString()}`,
-        url: `/customer/quotations/new?productId=${p.id}`,
+        url: `/quotations/new?productId=${p.id}`,
         badge: "Product",
       });
     });
 
-    // Map customers
-    customers.forEach((c) => {
-      results.push({
-        id: `c-${c.id}`,
-        type: "customer",
-        title: c.name,
-        subtitle: `${c.industry || "Enterprise"} • ${c.tier} Tier • Available Credit ₹${Number(c.creditAvailable).toLocaleString()}`,
-        url: `/customer/quotations/new?customerId=${c.id}`,
-        badge: `${c.tier} Tier`,
+    // Map customers (only for internal staff)
+    if (!isCustomer) {
+      customers.forEach((c) => {
+        results.push({
+          id: `c-${c.id}`,
+          type: "customer",
+          title: c.name,
+          subtitle: `${c.industry || "Enterprise"} • ${c.tier} Tier • Available Credit ₹${Number(c.creditAvailable).toLocaleString()}`,
+          url: `/quotations/new?customerId=${c.id}`,
+          badge: `${c.tier} Tier`,
+        });
       });
-    });
+    }
 
     return NextResponse.json({ results });
   } catch (error) {

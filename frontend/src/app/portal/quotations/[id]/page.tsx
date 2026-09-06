@@ -185,6 +185,7 @@ export default async function PortalQuotationDetailPage({ params }: PortalQuotat
         <CustomerNegotiationBox
           quotationId={quote.id}
           quotationNumber={quote.quotationNumber}
+          customerId={session.user.customerId}
           currentStatus={quote.status}
           negotiations={quote.negotiations}
           defaultSignatory={quote.primaryContact}

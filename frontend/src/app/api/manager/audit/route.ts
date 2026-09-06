@@ -61,8 +61,8 @@ export async function GET(req: NextRequest) {
         id: l.id,
         timestamp: l.createdAt.toISOString(),
         user: {
-          name: l.actorEmail?.split("@")[0] || "Sarah Manager",
-          email: l.actorEmail || "sarah.manager@dealflow360.io",
+          name: l.actorEmail?.split("@")[0] || "Commercial Approver",
+          email: l.actorEmail || "approvals@dealflow360.in",
           role: "Commercial Approver",
         },
         entity: l.entity,
@@ -112,8 +112,8 @@ export async function GET(req: NextRequest) {
           id: `audit-${q.id}-status`,
           timestamp: new Date(Date.now() - (idx * 3600000 + 600000)).toISOString(),
           user: {
-            name: "Sarah Manager",
-            email: "sarah.manager@dealflow360.io",
+            name: "Commercial Approver",
+            email: "approvals@dealflow360.in",
             role: "Commercial Approver",
           },
           entity: "ApprovalWorkflow",
@@ -121,7 +121,7 @@ export async function GET(req: NextRequest) {
           action: q.status === "APPROVED" ? "APPROVED" : q.status === "REJECTED" ? "REJECTED" : "WORKFLOW_STARTED",
           details:
             q.status === "APPROVED"
-              ? `Commercial approval signed off by Sarah Manager.`
+              ? `Commercial approval signed off by Commercial Approver.`
               : q.status === "REJECTED"
               ? `Rejected due to excessive margin concession.`
               : `Pending commercial sign-off in Sales Management queue.`,

@@ -5,6 +5,7 @@ import { confirmFulfillmentPlan } from "./fulfillmentService";
 export interface SanitizedCustomerQuote {
   id: string;
   quotationNumber: string;
+  customerId: string;
   customerName: string;
   customerCode: string;
   status: string;
@@ -96,6 +97,7 @@ function sanitizeQuotationForCustomer(quote: any): SanitizedCustomerQuote {
   return {
     id: quote.id,
     quotationNumber: quote.quotationNumber,
+    customerId: quote.customerId,
     customerName: quote.customer.name,
     customerCode: quote.customer.customerNumber || quote.customer.externalAccountId || "CUST-00001",
     status: quote.status,
@@ -135,9 +137,11 @@ function sanitizeQuotationForCustomer(quote: any): SanitizedCustomerQuote {
 
 export async function submitCounterOffer(params: {
   quotationId: string;
+  customerId?: string;
   proposedDiscount?: number;
   comments: string;
   actorName?: string;
+  actorEmail?: string;
 }) {
   const quote = await prisma.quotation.findUnique({
     where: { id: params.quotationId },
@@ -145,12 +149,17 @@ export async function submitCounterOffer(params: {
 
   if (!quote) throw new Error(`Quotation ${params.quotationId} not found`);
 
+  // Server-side authorization check: quote must belong to the customer
+  if (params.customerId && quote.customerId !== params.customerId) {
+    throw new Error("Unauthorized: Quotation does not belong to your customer account");
+  }
+
   return await prisma.$transaction(async (tx) => {
     const neg = await tx.customerNegotiation.create({
       data: {
         quotationId: quote.id,
         authorName: params.actorName || "Buyer Representative",
-        authorEmail: "buyer@enterprise.example",
+        authorEmail: params.actorEmail || "buyer@customer.example",
         authorRole: "CUSTOMER",
         eventType: "COUNTER_OFFER",
         message: params.comments,
@@ -187,6 +196,7 @@ export async function submitCounterOffer(params: {
 
 export async function acceptQuotationByCustomer(params: {
   quotationId: string;
+  customerId?: string;
   signatoryName: string;
   signatoryTitle: string;
   signatoryEmail: string;
@@ -197,6 +207,21 @@ export async function acceptQuotationByCustomer(params: {
   });
 
   if (!quote) throw new Error(`Quotation ${params.quotationId} not found`);
+
+  // Server-side authorization check: quote must belong to the customer
+  if (params.customerId && quote.customerId !== params.customerId) {
+    throw new Error("Unauthorized: Quotation does not belong to your customer account");
+  }
+
+  // Idempotency: If already accepted, return success without duplicate processing
+  if (quote.status === QuotationStatus.ACCEPTED) {
+    return {
+      success: true,
+      quotationNumber: quote.quotationNumber,
+      status: "ACCEPTED",
+      alreadyAccepted: true,
+    };
+  }
 
   // 1. Update quotation status to ACCEPTED
   await prisma.quotation.update({

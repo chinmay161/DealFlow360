@@ -211,17 +211,17 @@ export const QuoteActionBar: React.FC<QuoteActionBarProps> = ({
               <div className="grid grid-cols-2 gap-8 text-sm">
                 <div>
                   <h4 className="text-xs uppercase font-bold text-outline tracking-wider mb-2">Customer Account</h4>
-                  <div className="font-semibold text-base">{quotation?.customer.name || "Apex Infotech Pvt. Ltd."}</div>
+                  <div className="font-semibold text-base">{quotation?.customer.name || "Customer Account"}</div>
                   <div className="text-xs text-outline mt-1">
-                    Industry: {quotation?.customer.industry || "Enterprise Cloud & Infrastructure"}<br />
-                    Account ID: {quotation?.customer.externalAccountId || "AC-88219"}
+                    Industry: {quotation?.customer.industry || "General Enterprise"}<br />
+                    Account ID: {quotation?.customer.customerNumber || quotation?.customer.externalAccountId || "N/A"}
                   </div>
                 </div>
                 <div>
                   <h4 className="text-xs uppercase font-bold text-outline tracking-wider mb-2">Commercial Terms</h4>
                   <div className="text-xs text-outline space-y-1">
-                    <div>Payment Terms: <strong className="text-on-surface">Net 45 Days</strong></div>
-                    <div>Account Owner: <strong className="text-on-surface">{quotation?.owner.name || "Arjun Mehta"}</strong></div>
+                    <div>Payment Terms: <strong className="text-on-surface">{quotation?.customer.paymentTerms || "Standard Terms"}</strong></div>
+                    <div>Account Owner: <strong className="text-on-surface">{quotation?.owner?.name || "Assigned Representative"}</strong></div>
                     <div>Currency: <strong className="text-on-surface">{currency} ({getCurrencySymbol(currency)})</strong></div>
                   </div>
                 </div>

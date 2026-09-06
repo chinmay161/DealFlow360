@@ -5,18 +5,23 @@ import { Search, Building2, Check, CreditCard } from "lucide-react";
 import { quotationService } from "@/services/quotation.service";
 import type { Customer } from "@/types/quotation.types";
 import { Badge } from "@/components/ui/badge";
+import { useCurrentUser } from "@/lib/hooks/useCurrentUser";
 
 interface CustomerSelectorProps {
   selectedCustomer: Customer | null;
   onSelectCustomer: (customer: Customer) => void;
   error?: string;
+  isCustomerRole?: boolean;
 }
 
 export function CustomerSelector({
   selectedCustomer,
   onSelectCustomer,
   error,
+  isCustomerRole,
 }: CustomerSelectorProps) {
+  const { user } = useCurrentUser();
+  const isCustomer = isCustomerRole ?? (user?.role === "CUSTOMER");
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -29,7 +34,12 @@ export function CustomerSelector({
     quotationService
       .getCustomers(search)
       .then((data) => {
-        if (active) setCustomers(data);
+        if (active) {
+          setCustomers(data);
+          if (isCustomer && data.length > 0 && !selectedCustomer) {
+            onSelectCustomer(data[0]);
+          }
+        }
       })
       .catch((err) => console.error("Error fetching customers:", err))
       .finally(() => {
@@ -39,7 +49,7 @@ export function CustomerSelector({
     return () => {
       active = false;
     };
-  }, [search]);
+  }, [search, isCustomer, selectedCustomer, onSelectCustomer]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -57,13 +67,19 @@ export function CustomerSelector({
         Customer Account <span className="text-rose-500">*</span>
       </label>
 
-      {/* Selector Trigger */}
+      {/* Selector Trigger / Read-only card */}
       <div
-        onClick={() => setIsOpen(!isOpen)}
-        className={`w-full min-h-[44px] p-3 rounded-xl border bg-white cursor-pointer transition-all flex items-center justify-between ${
+        onClick={() => {
+          if (!isCustomer) {
+            setIsOpen(!isOpen);
+          }
+        }}
+        className={`w-full min-h-[44px] p-3 rounded-xl border bg-white transition-all flex items-center justify-between ${
+          isCustomer ? "cursor-default border-slate-200/80" : "cursor-pointer"
+        } ${
           error
             ? "border-rose-300 ring-1 ring-rose-200"
-            : isOpen
+            : !isCustomer && isOpen
             ? "border-blue-500 ring-2 ring-blue-500/20"
             : "border-slate-200/80 hover:border-slate-300"
         }`}
@@ -93,16 +109,20 @@ export function CustomerSelector({
             </div>
           </div>
         ) : (
-          <span className="text-xs text-slate-400">Select or search enterprise customer...</span>
+          <span className="text-xs text-slate-400">
+            {isCustomer ? "Loading customer account..." : "Select or search enterprise customer..."}
+          </span>
         )}
 
-        <span className="text-xs text-blue-600 font-medium">Change</span>
+        {!isCustomer && (
+          <span className="text-xs text-blue-600 font-medium">Change</span>
+        )}
       </div>
 
       {error && <p className="text-xs text-rose-500">{error}</p>}
 
-      {/* Autocomplete Dropdown */}
-      {isOpen && (
+      {/* Autocomplete Dropdown - strictly disabled for customers */}
+      {!isCustomer && isOpen && (
         <div className="absolute z-40 mt-1 w-full max-w-xl rounded-2xl border border-slate-200/80 bg-white shadow-xl overflow-hidden animate-in fade-in-0 zoom-in-95">
           <div className="p-3 border-b border-slate-100 bg-slate-50/50 flex items-center gap-2">
             <Search className="h-4 w-4 text-slate-400" />

@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Trash2, Copy, Plus, AlertTriangle, PackagePlus } from "lucide-react";
+import { Trash2, Copy, AlertTriangle, PackagePlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -26,7 +26,7 @@ interface LineItemsEditorProps {
   onRemoveLineItem: (index: number) => void;
   onDuplicateLineItem: (index: number) => void;
   onOpenCatalog: () => void;
-  onAddCustomItem: () => void;
+  onAddCustomItem?: () => void;
   error?: string;
 }
 
@@ -56,17 +56,6 @@ export function LineItemsEditor({
         <div className="flex items-center gap-2">
           <Button
             type="button"
-            variant="outline"
-            size="sm"
-            onClick={onAddCustomItem}
-            className="text-xs h-8"
-          >
-            <Plus className="h-3.5 w-3.5 mr-1" />
-            Custom Item
-          </Button>
-
-          <Button
-            type="button"
             variant="primary"
             size="sm"
             onClick={onOpenCatalog}
@@ -84,7 +73,7 @@ export function LineItemsEditor({
         <div className="p-8 text-center rounded-xl border border-dashed border-slate-200 bg-slate-50/50">
           <p className="text-xs font-semibold text-slate-700">No line items added yet</p>
           <p className="text-[11px] text-slate-400 mt-1 mb-3">
-            Click &quot;Add from Catalog&quot; to pick products or create a custom line item.
+            Click &quot;Add from Catalog&quot; to pick products.
           </p>
           <Button type="button" size="sm" onClick={onOpenCatalog} className="text-xs">
             Browse Product Catalog

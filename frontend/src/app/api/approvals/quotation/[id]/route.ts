@@ -62,7 +62,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
         stage: 2,
         stepName: "Sales Manager Review",
         approverRole: "MANAGER",
-        approverName: "Sarah Manager",
+        approverName: "Commercial Approver",
         status: quote.status === "APPROVED" ? ("APPROVED" as const) : ("PENDING" as const),
         decidedAt: quote.status === "APPROVED" ? quote.updatedAt.toISOString() : null,
         comments: quote.status === "APPROVED" ? "Commercial discount and margin verified." : null,
@@ -72,7 +72,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
         stage: 3,
         stepName: "Finance & Credit Verification",
         approverRole: "FINANCE",
-        approverName: "Frank Finance",
+        approverName: "Finance Authority",
         status:
           quote.status === "APPROVED"
             ? ("APPROVED" as const)

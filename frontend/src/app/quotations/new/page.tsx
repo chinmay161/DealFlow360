@@ -1,8 +1,16 @@
 import { Metadata } from "next";
+import { redirect } from "next/navigation";
 import { AppSidebar } from "@/components/AppSidebar";
 import { TopHeader } from "@/components/TopHeader";
-import { CreateQuotationForm, CustomerOption } from "@/components/quotations/CreateQuotationForm";
-import { prisma } from "@/lib/prisma";
+import { CreateQuotationForm } from "@/components/quotations/CreateQuotationForm";
+import { getCurrentUser } from "@/lib/auth";
+import { getAuthoritativeCustomerForSession } from "@/lib/services/portalAuthService";
+import {
+  getCustomerById,
+  getCustomerSelectorListAction,
+  CompleteCustomerProfile,
+  CustomerSelectorItem,
+} from "@/lib/actions/customerActions";
 
 export const dynamic = "force-dynamic";
 
@@ -16,56 +24,35 @@ interface PageProps {
 }
 
 export default async function NewQuotationPage({ searchParams }: PageProps) {
-  let customers: CustomerOption[] = [];
-  const resolvedParams = searchParams ? await searchParams : {};
-  const customerIdParam = typeof resolvedParams.customerId === "string" ? resolvedParams.customerId : undefined;
+  const currentUser = await getCurrentUser();
+  const isCustomerRole = currentUser?.role === "CUSTOMER";
 
-  try {
-    const rawCustomers = await prisma.customer.findMany({
-      select: {
-        id: true,
-        customerNumber: true,
-        name: true,
-        externalAccountId: true,
-        industry: true,
-        tier: true,
-        city: true,
-        state: true,
-        country: true,
-        paymentTerms: true,
-        contacts: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            title: true,
-          },
-          orderBy: { isPrimary: "desc" },
-        },
-      },
-      orderBy: { createdAt: "asc" },
-    });
+  let customerList: CustomerSelectorItem[] = [];
+  let initialCustomer: CompleteCustomerProfile | null = null;
 
-    customers = rawCustomers.map((c) => ({
-      id: c.id,
-      customerNumber: c.customerNumber,
-      name: c.name,
-      externalAccountId: c.externalAccountId,
-      industry: c.industry,
-      tier: c.tier,
-      city: c.city,
-      state: c.state,
-      country: c.country,
-      paymentTerms: c.paymentTerms,
-      contacts: c.contacts.map((ct) => ({
-        id: ct.id,
-        name: ct.name,
-        email: ct.email,
-        title: ct.title,
-      })),
-    }));
-  } catch (err) {
-    console.error("[NewQuotationPage] Error loading customers:", err);
+  if (isCustomerRole) {
+    // Authenticated CUSTOMER user:
+    // Organization MUST come from session / Contact in PostgreSQL.
+    // Customer CANNOT select, search, change, or enumerate organizations.
+    const authCustomer = await getAuthoritativeCustomerForSession(currentUser);
+    if (!authCustomer) {
+      redirect("/portal?error=CustomerProfileNotFound");
+    }
+    initialCustomer = await getCustomerById(authCustomer.id);
+    customerList = []; // Zero other organizations exposed to client
+  } else {
+    // Internal sales rep / employee flow
+    const resolvedParams = searchParams ? await searchParams : {};
+    const customerIdParam = typeof resolvedParams.customerId === "string" ? resolvedParams.customerId : undefined;
+
+    try {
+      customerList = await getCustomerSelectorListAction();
+      if (customerIdParam) {
+        initialCustomer = await getCustomerById(customerIdParam);
+      }
+    } catch (err) {
+      console.error("[NewQuotationPage] Error loading customers:", err);
+    }
   }
 
   return (
@@ -76,8 +63,10 @@ export default async function NewQuotationPage({ searchParams }: PageProps) {
         <main className="flex-1 flex flex-col overflow-hidden bg-background">
           <div className="flex-1 overflow-y-auto px-space-xl py-space-lg space-y-space-base">
             <CreateQuotationForm
-              customers={customers}
-              initialCustomerId={customerIdParam}
+              customers={customerList}
+              initialCustomer={initialCustomer}
+              initialCustomerId={initialCustomer?.id}
+              isCustomerRole={isCustomerRole}
             />
           </div>
         </main>

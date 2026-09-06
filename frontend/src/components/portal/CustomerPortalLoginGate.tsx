@@ -62,9 +62,15 @@ export const CustomerPortalLoginGate: React.FC<CustomerPortalLoginGateProps> = (
   };
 
   const handleStartGoogleOAuth = () => {
-    signIn("google", {
-      callbackUrl: "/portal",
-    });
+    signIn(
+      "google",
+      {
+        callbackUrl: "/portal",
+      },
+      {
+        login_hint: verifiedEmail,
+      }
+    );
   };
 
   const handleReset = () => {

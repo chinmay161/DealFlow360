@@ -15,13 +15,15 @@ import {
   MoreVertical,
 } from "lucide-react";
 
+import { useCurrentUser } from "@/lib/hooks/useCurrentUser";
+
 interface ManagerSidebarProps {
   onCloseMobile?: () => void;
 }
 
 export const ManagerSidebar: React.FC<ManagerSidebarProps> = ({ onCloseMobile }) => {
   const pathname = usePathname();
-  const { data: session } = useSession();
+  const { user, initials, roleDisplay } = useCurrentUser();
   const [showMenu, setShowMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -39,17 +41,9 @@ export const ManagerSidebar: React.FC<ManagerSidebarProps> = ({ onCloseMobile })
     };
   }, [showMenu]);
 
-  const userName = session?.user?.name || "Sarah Manager";
-  const userEmail = session?.user?.email || "sarah.manager@dealflow360.io";
-  const userRole = "Commercial Sales Manager";
-
-  const initials =
-    userName
-      .split(" ")
-      .filter(Boolean)
-      .slice(0, 2)
-      .map((part) => part[0].toUpperCase())
-      .join("") || "SM";
+  const userName = user?.name || "Commercial Manager";
+  const userEmail = user?.email || "";
+  const userRole = user?.title || user?.roleDisplay || roleDisplay;
 
   const isDashboard = pathname === "/manager/dashboard" || pathname === "/manager";
   const isApprovals = pathname.startsWith("/manager/approvals");

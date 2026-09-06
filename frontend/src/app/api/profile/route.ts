@@ -1,30 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getCurrentUser } from "@/lib/services/currentUserService";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const user = await prisma.user.findFirst({
-      where: { role: "SALES_REP" },
-    });
-
-    const fallbackUser = user || (await prisma.user.findFirst());
+    const currentUser = await getCurrentUser();
+    if (!currentUser) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
     return NextResponse.json({
-      id: fallbackUser?.id || "user-1",
-      name: fallbackUser?.name || "Rachel Rep",
-      email: fallbackUser?.email || "rachel.rep@dealflow360.com",
-      role: "Sales Executive",
-      avatarUrl: fallbackUser?.image || fallbackUser?.avatarUrl || null,
-      department: "Commercial & Strategic Deals",
-      territory: "Western & Northern India Enterprise",
-      preferences: {
-        currency: "INR",
-        emailAlerts: true,
-        approvalUpdates: true,
-        compactView: false,
-      },
+      id: currentUser.id,
+      name: currentUser.name,
+      email: currentUser.email,
+      role: currentUser.roleDisplay,
+      title: currentUser.title,
+      avatarUrl: currentUser.image,
+      department: currentUser.department,
+      territory: currentUser.territory,
+      preferences: currentUser.preferences,
     });
   } catch (error) {
     console.error("[API profile GET] Error:", error);
@@ -34,11 +30,31 @@ export async function GET() {
 
 export async function PATCH(req: NextRequest) {
   try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const body = await req.json();
+    const updatedPreferences = {
+      ...currentUser.preferences,
+      ...(body.preferences || {}),
+    };
+
+    // Persist to PostgreSQL User record
+    await prisma.user.update({
+      where: { id: currentUser.id },
+      data: {
+        preferences: updatedPreferences,
+        ...(body.territory ? { territory: body.territory } : {}),
+        ...(body.department ? { department: body.department } : {}),
+      },
+    });
+
     return NextResponse.json({
       success: true,
       message: "Preferences updated successfully",
-      preferences: body.preferences,
+      preferences: updatedPreferences,
     });
   } catch (error) {
     console.error("[API profile PATCH] Error:", error);

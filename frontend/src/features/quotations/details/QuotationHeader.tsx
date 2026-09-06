@@ -87,7 +87,7 @@ export function QuotationHeader({ quotation, onRefresh }: QuotationHeaderProps) 
             <span>•</span>
             <span>Created: {new Date(quotation.createdAt).toLocaleDateString()}</span>
             <span>•</span>
-            <span>Owner: {quotation.owner?.name || "Rachel Rep"}</span>
+            <span>Owner: {quotation.owner?.name || "Commercial Representative"}</span>
           </div>
         </div>
 

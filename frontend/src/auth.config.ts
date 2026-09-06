@@ -1,7 +1,7 @@
 import type { NextAuthConfig } from "next-auth";
 import Google from "next-auth/providers/google";
 
-export const ALLOWED_DOMAINS = ["gmail.com", "ves.ac.in", "odoo.com"] as const;
+export const ALLOWED_DOMAINS = ["gmail.com", "ves.ac.in", "odoo.com", "dealflow360.in"] as const;
 
 /**
  * Strict server-side verification of allowed email domains.
@@ -111,10 +111,28 @@ export const authConfig: NextAuthConfig = {
         return true;
       }
 
-      // If customer logs in or attempts to access internal sales dashboard, overview, or root, redirect to customer portal
+      // If customer logs in or attempts to access internal sales routes, redirect to customer portal
       if (isLoggedIn && (auth?.user as any)?.role === "CUSTOMER") {
-        if (pathname === "/dashboard" || pathname === "/overview" || pathname === "/" || pathname.startsWith("/customer")) {
+        if (
+          pathname === "/dashboard" ||
+          pathname === "/overview" ||
+          pathname === "/" ||
+          pathname === "/customer" ||
+          pathname.startsWith("/customer/") ||
+          pathname.startsWith("/customers") ||
+          pathname.startsWith("/approvals") ||
+          pathname.startsWith("/audit") ||
+          pathname.startsWith("/configuration") ||
+          pathname.startsWith("/fulfillment") ||
+          pathname.startsWith("/inventory") ||
+          pathname.startsWith("/invoices") ||
+          pathname.startsWith("/reports") ||
+          pathname.startsWith("/subscriptions")
+        ) {
           return Response.redirect(new URL("/portal", nextUrl));
+        }
+        if (pathname === "/quotations" || (pathname.startsWith("/quotations/") && pathname !== "/quotations/new")) {
+          return Response.redirect(new URL("/portal/quotations", nextUrl));
         }
       }
 

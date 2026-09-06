@@ -167,7 +167,7 @@ export const CustomerSummary: React.FC<CustomerSummaryProps> = ({
           </span>
           <div className="flex items-center gap-1.5">
             <span className="font-title-md text-body-md font-semibold text-on-surface">
-              {paymentTerms || "Net 45 Days"}
+              {paymentTerms || customer?.paymentTerms || "Standard Terms"}
             </span>
             <span className="inline-block px-1.5 py-0.2 rounded text-[10px] font-medium bg-[#EFF6FF] text-[#1E40AF]">
               Standard

@@ -52,6 +52,39 @@ export async function findPortalContactByEmail(email: string) {
 }
 
 /**
+ * Resolves the authoritative Customer record from PostgreSQL for an authenticated user session.
+ * For CUSTOMER role, verifies against Customer.id from session and/or verified Contact in PostgreSQL.
+ */
+export async function getAuthoritativeCustomerForSession(user?: {
+  id?: string;
+  email?: string | null;
+  role?: string;
+  customerId?: string | null;
+} | null) {
+  if (!user) return null;
+
+  if (user.role === "CUSTOMER") {
+    // 1. Direct verified customerId from session token
+    if (user.customerId) {
+      const customer = await prisma.customer.findUnique({
+        where: { id: user.customerId },
+      });
+      if (customer) return customer;
+    }
+
+    // 2. Identity chain via contact email verified in PostgreSQL
+    if (user.email) {
+      const contact = await findPortalContactByEmail(user.email);
+      if (contact?.customer) {
+        return contact.customer;
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
  * Check if a portal contact with this email is already registered,
  * regardless of portal access flag or customer association.
  * Used to enforce uniqueness during customer/contact registration.

@@ -1,9 +1,11 @@
 import { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { AppSidebar } from "@/components/AppSidebar";
 import { TopHeader } from "@/components/TopHeader";
 import { QuotationDetailView } from "@/components/quotations/QuotationDetailView";
 import { getQuotationWithLineItems } from "@/lib/quotations";
+import { getCurrentUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -23,8 +25,13 @@ export async function generateMetadata({
 }
 
 export default async function QuotationDetailPage({ params }: QuotationDetailPageProps) {
+  const currentUser = await getCurrentUser();
   const { id } = await params;
   const decodedId = decodeURIComponent(id);
+
+  if (currentUser?.role === "CUSTOMER") {
+    redirect(`/portal/quotations/${decodedId}`);
+  }
 
   let quotation = null;
   let errorMessage: string | null = null;

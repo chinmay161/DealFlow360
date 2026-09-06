@@ -10,6 +10,7 @@ import {
 interface CustomerNegotiationBoxProps {
   quotationId: string;
   quotationNumber: string;
+  customerId?: string;
   currentStatus: string;
   negotiations?: Array<{
     id: string;
@@ -28,6 +29,7 @@ interface CustomerNegotiationBoxProps {
 export const CustomerNegotiationBox: React.FC<CustomerNegotiationBoxProps> = ({
   quotationId,
   quotationNumber,
+  customerId,
   currentStatus,
   negotiations = [],
   defaultSignatory,
@@ -56,9 +58,11 @@ export const CustomerNegotiationBox: React.FC<CustomerNegotiationBoxProps> = ({
     try {
       await submitCounterOffer({
         quotationId,
+        customerId,
         comments: commentText.trim(),
         proposedDiscount: targetDiscount ? parseFloat(targetDiscount) : undefined,
         actorName: defaultSignatory?.name || "Customer Representative",
+        actorEmail: defaultSignatory?.email || signatoryEmail.trim(),
       });
       setCommentText("");
       setTargetDiscount("");
@@ -82,6 +86,7 @@ export const CustomerNegotiationBox: React.FC<CustomerNegotiationBoxProps> = ({
     try {
       await acceptQuotationByCustomer({
         quotationId,
+        customerId,
         signatoryName: signatoryName.trim(),
         signatoryTitle: signatoryTitle.trim(),
         signatoryEmail: signatoryEmail.trim(),

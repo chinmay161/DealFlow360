@@ -93,7 +93,7 @@ export async function GET() {
         eventType,
         title,
         description,
-        actorName: q.owner?.name || "Sarah Manager",
+        actorName: q.owner?.name || "Commercial Representative",
         actorRole: isApproved ? "Commercial Approver" : "Sales Executive",
         timestamp: q.updatedAt.toISOString(),
         badgeColor,

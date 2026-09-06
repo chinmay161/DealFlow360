@@ -6,15 +6,14 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   FileText,
-  PlusCircle,
   User,
   LogOut,
-  Sparkles,
   Layers,
   X,
 } from "lucide-react";
 import { cn } from "@/components/ui/card";
 import { signOut } from "next-auth/react";
+import { useCurrentUser } from "@/lib/hooks/useCurrentUser";
 
 interface SidebarProps {
   onCloseMobile?: () => void;
@@ -22,6 +21,10 @@ interface SidebarProps {
 
 export function Sidebar({ onCloseMobile }: SidebarProps) {
   const pathname = usePathname();
+  const { user, initials, roleDisplay } = useCurrentUser();
+  const [imgError, setImgError] = React.useState(false);
+  const displayName = user?.name || "Commercial User";
+  const displayRole = user?.roleDisplay || roleDisplay;
 
   const navLinks = [
     {
@@ -34,13 +37,7 @@ export function Sidebar({ onCloseMobile }: SidebarProps) {
       name: "Quotations",
       href: "/customer/quotations",
       icon: FileText,
-      active: pathname === "/customer/quotations" || (pathname.startsWith("/customer/quotations/") && pathname !== "/customer/quotations/new"),
-    },
-    {
-      name: "New Quotation",
-      href: "/customer/quotations/new",
-      icon: PlusCircle,
-      active: pathname === "/customer/quotations/new",
+      active: pathname === "/customer/quotations" || pathname.startsWith("/customer/quotations/"),
     },
     {
       name: "Profile",
@@ -123,33 +120,31 @@ export function Sidebar({ onCloseMobile }: SidebarProps) {
         })}
       </div>
 
-      {/* Fast-Track Action Callout */}
-      <div className="p-3 mx-3 mb-4 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white shadow-md shadow-blue-500/20">
-        <div className="flex items-center gap-2 mb-1">
-          <Sparkles className="h-4 w-4 text-amber-300" />
-          <span className="text-xs font-semibold">Rule Engine Active</span>
-        </div>
-        <p className="text-[11px] text-blue-100 leading-snug">
-          Governance & counterfactuals evaluate automatically on draft submission.
-        </p>
-      </div>
-
       {/* User Section & Logout */}
       <div className="p-3 border-t border-slate-100 dark:border-slate-800 space-y-1 bg-slate-50/50 dark:bg-slate-900/30">
         <Link
-          href="/profile"
+          href="/customer/profile"
           onClick={onCloseMobile}
           className="flex items-center gap-3 p-2 rounded-xl hover:bg-white dark:hover:bg-slate-900 transition-colors"
         >
-          <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-slate-700 to-slate-900 text-white flex items-center justify-center font-bold text-xs shadow-sm">
-            RR
+          <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-slate-700 to-slate-900 text-white flex items-center justify-center font-bold text-xs shadow-sm overflow-hidden shrink-0">
+            {user?.image && !imgError ? (
+              <img
+                src={user.image}
+                alt={displayName}
+                className="w-full h-full object-cover"
+                onError={() => setImgError(true)}
+              />
+            ) : (
+              <span>{initials}</span>
+            )}
           </div>
           <div className="flex-1 min-w-0">
             <div className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">
-              Rachel Rep
+              {displayName}
             </div>
             <div className="text-[11px] text-slate-400 truncate">
-              Sales Executive
+              {displayRole}
             </div>
           </div>
         </Link>

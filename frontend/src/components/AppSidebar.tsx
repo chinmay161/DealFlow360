@@ -4,10 +4,11 @@ import React, { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
+import { useCurrentUser } from "@/lib/hooks/useCurrentUser";
 
 export const AppSidebar: React.FC = () => {
   const pathname = usePathname();
-  const { data: session } = useSession();
+  const { user, initials, roleDisplay } = useCurrentUser();
   const [showMenu, setShowMenu] = useState(false);
   const [counts, setCounts] = useState<{ quotesCount: number; pendingApprovalsCount: number }>({
     quotesCount: 12,
@@ -49,25 +50,10 @@ export const AppSidebar: React.FC = () => {
 
   const [imgError, setImgError] = useState(false);
 
-  const userName =
-    session?.user?.name ||
-    (session?.user?.email ? session.user.email.split("@")[0] : "Commercial User");
-  const userEmail = session?.user?.email || "operator@dealflow360.io";
-  const userRole =
-    (session?.user as { role?: string })?.role === "ADMIN"
-      ? "Administrator"
-      : (session?.user as { role?: string })?.role === "APPROVER"
-      ? "Approval Authority"
-      : "Sales Representative";
-
-  const initials =
-    userName
-      .split(" ")
-      .filter(Boolean)
-      .slice(0, 2)
-      .map((part) => part[0].toUpperCase())
-      .join("") || "CU";
-  const avatarUrl = session?.user?.image;
+  const userName = user?.name || "Commercial User";
+  const userEmail = user?.email || "";
+  const userRole = user?.roleDisplay || roleDisplay;
+  const avatarUrl = user?.image;
 
   const isOverview = pathname === "/overview" || pathname.startsWith("/overview") || pathname === "/";
   const isApprovals = pathname === "/approvals" || pathname.startsWith("/approvals");
@@ -357,6 +343,16 @@ export const AppSidebar: React.FC = () => {
               </span>
             </div>
             <div className="py-1">
+              <Link
+                href="/customer/profile"
+                onClick={() => setShowMenu(false)}
+                className="w-full text-left px-3 py-1.5 text-xs text-on-surface-variant hover:bg-surface-container-low rounded-lg flex items-center gap-2"
+              >
+                <span className="material-symbols-outlined text-sm" data-icon="person">
+                  person
+                </span>
+                Profile &amp; Settings
+              </Link>
               <Link
                 href="/configuration"
                 onClick={() => setShowMenu(false)}

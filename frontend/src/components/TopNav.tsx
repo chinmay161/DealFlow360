@@ -5,6 +5,7 @@ import { Search, Menu, Command } from "lucide-react";
 import { NotificationDropdown } from "@/features/notifications/NotificationDropdown";
 import { GlobalSearchModal } from "@/features/search/GlobalSearchModal";
 import Link from "next/link";
+import { useCurrentUser } from "@/lib/hooks/useCurrentUser";
 
 interface TopNavProps {
   onOpenMobileMenu: () => void;
@@ -12,6 +13,10 @@ interface TopNavProps {
 
 export function TopNav({ onOpenMobileMenu }: TopNavProps) {
   const [searchModalOpen, setSearchModalOpen] = useState(false);
+  const [imgError, setImgError] = useState(false);
+  const { user, initials, roleDisplay } = useCurrentUser();
+  const displayName = user?.name || "Commercial User";
+  const displayRole = user?.roleDisplay || roleDisplay;
 
   // Keyboard shortcut Cmd/Ctrl + K
   useEffect(() => {
@@ -65,15 +70,24 @@ export function TopNav({ onOpenMobileMenu }: TopNavProps) {
             href="/customer/profile"
             className="flex items-center gap-2.5 p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-900 transition-colors group"
           >
-            <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs shadow-sm shadow-blue-500/20 group-hover:scale-105 transition-transform">
-              RR
+            <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs shadow-sm shadow-blue-500/20 group-hover:scale-105 transition-transform overflow-hidden">
+              {user?.image && !imgError ? (
+                <img
+                  src={user.image}
+                  alt={displayName}
+                  className="w-full h-full object-cover"
+                  onError={() => setImgError(true)}
+                />
+              ) : (
+                <span>{initials}</span>
+              )}
             </div>
             <div className="hidden sm:flex flex-col text-left">
-              <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 group-hover:text-blue-600 transition-colors leading-tight">
-                Rachel Rep
+              <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 group-hover:text-blue-600 transition-colors leading-tight truncate max-w-[140px]">
+                {displayName}
               </span>
-              <span className="text-[10px] text-slate-400 font-medium leading-none">
-                Sales Executive
+              <span className="text-[10px] text-slate-400 font-medium leading-none truncate max-w-[140px]">
+                {displayRole}
               </span>
             </div>
           </Link>

@@ -27,7 +27,7 @@ export async function GET() {
       } else if (i === 1) {
         category = "MANAGER_COMMENT";
         title = `Manager Feedback on #${q.quotationNumber}`;
-        message = `Sarah Manager: "Please verify warranty bundle pricing."`;
+        message = `Commercial Approver: "Please verify warranty bundle pricing."`;
       } else if (i === 2) {
         category = "QUOTATION_RETURNED";
         title = `Quotation #${q.quotationNumber} Returned for Revision`;

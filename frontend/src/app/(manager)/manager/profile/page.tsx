@@ -11,23 +11,19 @@ import {
 } from "lucide-react";
 import { useToast } from "@/components/providers/ToastProvider";
 
+import { useCurrentUser } from "@/lib/hooks/useCurrentUser";
+
 export default function ManagerProfilePage() {
-  const { data: session } = useSession();
+  const { user, initials, roleDisplay } = useCurrentUser();
   const { success } = useToast();
 
   const [instantAlerts, setInstantAlerts] = useState(true);
   const [highRiskSms, setHighRiskSms] = useState(false);
   const [autoDelegation, setAutoDelegation] = useState(false);
 
-  const userName = session?.user?.name || "Sarah Manager";
-  const userEmail = session?.user?.email || "sarah.manager@dealflow360.io";
-  const initials =
-    userName
-      .split(" ")
-      .filter(Boolean)
-      .slice(0, 2)
-      .map((part) => part[0].toUpperCase())
-      .join("") || "SM";
+  const userName = user?.name || "Commercial Manager";
+  const userEmail = user?.email || "";
+  const displayRole = user?.title || user?.roleDisplay || roleDisplay;
 
   const handleSavePreferences = () => {
     success("Preferences Saved", "Manager notification and SLA triggers updated.");
@@ -55,7 +51,7 @@ export default function ManagerProfilePage() {
             <div className="flex items-center gap-2">
               <h2 className="text-lg font-bold text-on-surface">{userName}</h2>
               <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-primary/10 text-primary border border-primary/20">
-                Sales Manager (Level 1)
+                {displayRole}
               </span>
             </div>
             <p className="text-xs text-outline mt-0.5 flex items-center gap-1.5">

@@ -1,9 +1,11 @@
 import { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { AppSidebar } from "@/components/AppSidebar";
 import { TopHeader } from "@/components/TopHeader";
 import { QuotationsListTable } from "@/components/quotations/QuotationsListTable";
 import { getQuotations, SerializedQuotationListItem } from "@/lib/quotations";
+import { getCurrentUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +19,11 @@ interface QuotationsPageProps {
 }
 
 export default async function QuotationsPage({ searchParams }: QuotationsPageProps) {
+  const currentUser = await getCurrentUser();
+  if (currentUser?.role === "CUSTOMER") {
+    redirect("/portal/quotations");
+  }
+
   const resolvedParams = searchParams ? await searchParams : {};
   let quotations: SerializedQuotationListItem[] = [];
   let listError: string | null = null;

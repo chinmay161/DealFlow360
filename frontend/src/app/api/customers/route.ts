@@ -1,10 +1,35 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { auth } from "@/auth";
+import { getAuthoritativeCustomerForSession } from "@/lib/services/portalAuthService";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   try {
+    const session = await auth();
+
+    // CUSTOMER role cannot enumerate all organizations
+    if (session?.user?.role === "CUSTOMER") {
+      const authCustomer = await getAuthoritativeCustomerForSession(session.user);
+      if (!authCustomer) {
+        return NextResponse.json([]);
+      }
+      return NextResponse.json([
+        {
+          id: authCustomer.id,
+          name: authCustomer.name,
+          industry: authCustomer.industry,
+          tier: authCustomer.tier,
+          paymentTerms: authCustomer.paymentTerms,
+          creditLimit: Number(authCustomer.creditLimit),
+          creditAvailable: Number(authCustomer.creditAvailable),
+          territory: authCustomer.territory,
+          ownerId: authCustomer.ownerId,
+        },
+      ]);
+    }
+
     const { searchParams } = new URL(req.url);
     const search = searchParams.get("search")?.trim();
 

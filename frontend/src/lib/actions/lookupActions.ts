@@ -1,6 +1,8 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
+import { getCurrentUser } from "@/lib/auth";
+import { getAuthoritativeCustomerForSession } from "@/lib/services/portalAuthService";
 
 export async function getActiveProductsAction() {
   const products = await prisma.product.findMany({
@@ -31,6 +33,40 @@ export async function getActiveProductsAction() {
 }
 
 export async function getCustomersAction() {
+  const currentUser = await getCurrentUser();
+  if (currentUser?.role === "CUSTOMER") {
+    // If customer role, strictly return only their own organization
+    const authCustomer = await getAuthoritativeCustomerForSession(currentUser);
+    if (!authCustomer) return [];
+
+    const full = await prisma.customer.findUnique({
+      where: { id: authCustomer.id },
+      include: {
+        contacts: true,
+        owner: true,
+      },
+    });
+
+    if (!full) return [];
+
+    return [{
+      id: full.id,
+      customerNumber: full.customerNumber,
+      name: full.name,
+      externalAccountId: full.externalAccountId,
+      industry: full.industry,
+      tier: full.tier,
+      paymentTerms: full.paymentTerms,
+      creditLimit: Number(full.creditLimit),
+      creditAvailable: Number(full.creditAvailable),
+      territory: full.territory,
+      city: full.city,
+      state: full.state,
+      country: full.country,
+      primaryContact: full.contacts.find((cnt) => cnt.isPrimary) || full.contacts[0] || null,
+    }];
+  }
+
   const customers = await prisma.customer.findMany({
     include: {
       contacts: true,

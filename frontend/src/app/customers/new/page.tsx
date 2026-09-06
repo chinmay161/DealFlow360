@@ -1,8 +1,10 @@
 import { Metadata } from "next";
+import { redirect } from "next/navigation";
 import { AppSidebar } from "@/components/AppSidebar";
 import { TopHeader } from "@/components/TopHeader";
 import { CreateCustomerForm } from "@/components/customers/CreateCustomerForm";
 import { getNextCustomerNumber } from "@/lib/actions/customerActions";
+import { getCurrentUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +14,11 @@ export const metadata: Metadata = {
 };
 
 export default async function NewCustomerPage() {
+  const currentUser = await getCurrentUser();
+  if (currentUser?.role === "CUSTOMER") {
+    redirect("/portal");
+  }
+
   const nextCustomerNumber = await getNextCustomerNumber();
 
   return (

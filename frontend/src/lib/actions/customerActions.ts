@@ -5,7 +5,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { CreateCustomerSchema } from "@/lib/validations/customer";
 import { getCurrentUser } from "@/lib/auth";
-import { normalizeEmail, normalizePhone, findExistingContactByEmail } from "@/lib/services/portalAuthService";
+import { normalizeEmail, normalizePhone, findExistingContactByEmail, getAuthoritativeCustomerForSession } from "@/lib/services/portalAuthService";
 
 function safeRevalidate() {
   try {
@@ -70,6 +70,14 @@ async function resolveAuthenticatedOwner() {
 
 export async function createCustomerAction(input: unknown) {
   try {
+    const sessionUser = await getCurrentUser();
+    if (sessionUser?.role === "CUSTOMER") {
+      return {
+        success: false,
+        error: "Unauthorized: Customer users cannot register new customer organizations",
+      };
+    }
+
     const parsed = CreateCustomerSchema.parse(input);
     const owner = await resolveAuthenticatedOwner();
 
@@ -152,23 +160,189 @@ export async function createCustomerAction(input: unknown) {
 
     safeRevalidate();
 
-    return {
-      success: true,
-      customer: {
-        id: newCustomer.id,
-        customerNumber: newCustomer.customerNumber,
-        name: newCustomer.name,
-      },
-    };
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      const fieldErrors = error.errors.map((e) => `${e.path.join(".")}: ${e.message}`).join(", ");
-      return { success: false, error: fieldErrors };
+      return {
+        success: true,
+        customer: {
+          id: newCustomer.id,
+          customerNumber: newCustomer.customerNumber,
+          name: newCustomer.name,
+        },
+      };
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        const fieldErrors = error.errors.map((e) => `${e.path.join(".")}: ${e.message}`).join(", ");
+        return { success: false, error: fieldErrors };
+      }
+      console.error("[createCustomerAction] Error:", error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Failed to create customer",
+      };
     }
-    console.error("[createCustomerAction] Error:", error);
+  }
+
+  export interface CompleteCustomerContact {
+    id: string;
+    name: string;
+    email: string;
+    phone: string | null;
+    title: string | null;
+    isPrimary: boolean;
+    portalAccessEnabled: boolean;
+    isActive: boolean;
+  }
+
+  export interface CompleteCustomerProfile {
+    id: string;
+    customerNumber: string | null;
+    name: string;
+    externalAccountId: string | null;
+    industry: string | null;
+    otherIndustryDetails: string | null;
+    tier: string;
+    paymentTerms: string | null;
+    creditLimit: number;
+    creditAvailable: number;
+    territory: string | null;
+    city: string | null;
+    state: string | null;
+    country: string | null;
+    priceList: {
+      id: string;
+      code: string;
+      name: string;
+    } | null;
+    owner: {
+      id: string;
+      name: string | null;
+      email: string;
+      role: string;
+    } | null;
+    primaryContact: CompleteCustomerContact | null;
+    contacts: CompleteCustomerContact[];
+  }
+
+  export interface CustomerSelectorItem {
+    id: string;
+    customerNumber: string | null;
+    name: string;
+    city: string | null;
+    state: string | null;
+    country: string | null;
+    industry: string | null;
+    tier: string;
+  }
+
+  export async function getCustomerById(customerId: string): Promise<CompleteCustomerProfile | null> {
+    if (!customerId) return null;
+
+    const customer = await prisma.customer.findUnique({
+      where: { id: customerId },
+      include: {
+        contacts: {
+          orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }],
+        },
+        owner: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true,
+          },
+        },
+      },
+    });
+
+    if (!customer) return null;
+
+    const priceList = customer.tier
+      ? await prisma.priceList.findFirst({
+          where: { tier: customer.tier, isActive: true },
+          select: { id: true, code: true, name: true },
+        })
+      : null;
+
+    const mappedContacts: CompleteCustomerContact[] = customer.contacts.map((ct) => ({
+      id: ct.id,
+      name: ct.name,
+      email: ct.email,
+      phone: ct.phone,
+      title: ct.title,
+      isPrimary: ct.isPrimary,
+      portalAccessEnabled: ct.portalAccessEnabled || ct.portalAccess,
+      isActive: ct.isActive,
+    }));
+
+    const primaryContact = mappedContacts.find((c) => c.isPrimary) || mappedContacts[0] || null;
+
     return {
-      success: false,
-      error: error instanceof Error ? error.message : "Failed to create customer",
+      id: customer.id,
+      customerNumber: customer.customerNumber,
+      name: customer.name,
+      externalAccountId: customer.externalAccountId,
+      industry: customer.industry,
+      otherIndustryDetails: customer.otherIndustryDetails,
+      tier: customer.tier,
+      paymentTerms: customer.paymentTerms,
+      creditLimit: Number(customer.creditLimit),
+      creditAvailable: Number(customer.creditAvailable),
+      territory: customer.territory,
+      city: customer.city,
+      state: customer.state,
+      country: customer.country,
+      priceList: priceList ? { id: priceList.id, code: priceList.code, name: priceList.name } : null,
+      owner: customer.owner ? {
+        id: customer.owner.id,
+        name: customer.owner.name,
+        email: customer.owner.email,
+        role: customer.owner.role,
+      } : null,
+      primaryContact,
+      contacts: mappedContacts,
     };
   }
-}
+
+  export async function getCustomerByIdAction(customerId: string): Promise<CompleteCustomerProfile | null> {
+    const sessionUser = await getCurrentUser();
+    if (sessionUser?.role === "CUSTOMER") {
+      const authCustomer = await getAuthoritativeCustomerForSession(sessionUser);
+      if (!authCustomer || authCustomer.id !== customerId) {
+        // Customer cannot inspect or load any other customer's profile
+        return null;
+      }
+    }
+    return getCustomerById(customerId);
+  }
+
+  export async function getCustomerSelectorListAction(): Promise<CustomerSelectorItem[]> {
+    const sessionUser = await getCurrentUser();
+    if (sessionUser?.role === "CUSTOMER") {
+      // Customer users are strictly blocked from enumerating enterprise accounts
+      return [];
+    }
+
+    const customers = await prisma.customer.findMany({
+      select: {
+        id: true,
+        customerNumber: true,
+        name: true,
+        city: true,
+        state: true,
+        country: true,
+        industry: true,
+        tier: true,
+      },
+      orderBy: { name: "asc" },
+    });
+
+    return customers.map((c) => ({
+      id: c.id,
+      customerNumber: c.customerNumber,
+      name: c.name,
+      city: c.city,
+      state: c.state,
+      country: c.country,
+      industry: c.industry,
+      tier: c.tier,
+    }));
+  }
