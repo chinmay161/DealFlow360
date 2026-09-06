@@ -135,22 +135,57 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
         },
       });
 
-      await prisma.approval.update({
-        where: { id: step.approvalId },
-        data: {
-          status: "APPROVED",
-          resolvedAt: new Date(),
+      // Check if other steps in this approval are still pending
+      const remainingSteps = await prisma.approvalWorkflowStep.findMany({
+        where: {
+          approvalId: step.approvalId,
+          id: { not: step.id },
+          status: { in: ["PENDING", "IN_PROGRESS"] },
         },
       });
 
-      if (step.approval?.quotationId) {
-        await prisma.quotation.update({
-          where: { id: step.approval.quotationId },
+      const parentApproval = await prisma.approval.findUnique({
+        where: { id: step.approvalId },
+      });
+
+      if (remainingSteps.length === 0) {
+        // All steps completed: Final approval granted
+        await prisma.approval.update({
+          where: { id: step.approvalId },
+          data: { status: "APPROVED", resolvedAt: new Date() },
+        });
+
+        if (parentApproval?.quotationId) {
+          await prisma.quotation.update({
+            where: { id: parentApproval.quotationId },
+            data: {
+              status: "APPROVED",
+              currentStage: "Approved",
+            },
+          });
+        }
+      } else {
+        // Multi-stage progression: Activate next step
+        const nextStep = remainingSteps.sort((a, b) => a.stepOrder - b.stepOrder)[0];
+        await prisma.approvalWorkflowStep.update({
+          where: { id: nextStep.id },
+          data: { status: "IN_PROGRESS" },
+        });
+        await prisma.approval.update({
+          where: { id: step.approvalId },
           data: {
-            status: "APPROVED",
-            currentStage: "Approved",
+            currentStep: nextStep.stepOrder,
+            assignedToId: nextStep.approverId,
           },
         });
+        if (parentApproval?.quotationId) {
+          await prisma.quotation.update({
+            where: { id: parentApproval.quotationId },
+            data: {
+              currentStage: nextStep.role.includes("Finance") ? "Finance Review" : "Manager Approval",
+            },
+          });
+        }
       }
 
       return NextResponse.json({ success: true, message: "Step approved successfully" });

@@ -30,8 +30,14 @@ function safeRevalidateQuote(quotationId?: string) {
     revalidatePath("/quotations", "layout");
     revalidatePath("/dashboard", "layout");
     revalidatePath("/approvals", "layout");
+    revalidatePath("/overview", "layout");
+    revalidatePath("/customer/quotations", "layout");
+    revalidatePath("/customer/dashboard", "layout");
+    revalidatePath("/portal/quotations", "layout");
     if (quotationId) {
       revalidatePath(`/quotations/${quotationId}`);
+      revalidatePath(`/customer/quotations/${quotationId}`);
+      revalidatePath(`/portal/quotations/${quotationId}`);
     }
   } catch {
     // Safe no-op outside Next.js request context (e.g. CLI tests)
@@ -64,13 +70,22 @@ async function resolveAuthenticatedOwner() {
       });
       if (user) return user;
     }
+    if (sessionUser?.id) {
+      const user = await prisma.user.findUnique({
+        where: { id: sessionUser.id },
+      });
+      if (user) return user;
+    }
   } catch {
     // Session retrieval outside Next request context
   }
 
   const fallback = await prisma.user.findFirst({
-    where: { email: "arjun.mehta@dealflow360.in" },
-  }) ?? await prisma.user.findFirst();
+    where: { role: { in: ["SALES_REP", "MANAGER", "ADMIN"] } },
+    orderBy: { createdAt: "asc" },
+  }) ?? await prisma.user.findFirst({
+    orderBy: { createdAt: "asc" },
+  });
 
   if (!fallback) {
     throw new Error("Cannot create quotation: No active user found in database");
@@ -162,8 +177,11 @@ export async function createNewQuotationAction(customerId?: string) {
     if (customerId && customerId !== authCustomer.id) {
       throw new Error("Unauthorized: Customer users cannot create quotations for other organizations");
     }
+    if (!authCustomer.ownerId) {
+      throw new Error("Cannot create quotation: Customer organization has no assigned internal account owner");
+    }
     targetCustomerId = authCustomer.id;
-    targetOwnerId = authCustomer.ownerId || (await resolveAuthenticatedOwner()).id;
+    targetOwnerId = authCustomer.ownerId;
   } else {
     let targetCustomer = null;
     if (customerId) {
@@ -182,9 +200,14 @@ export async function createNewQuotationAction(customerId?: string) {
       throw new Error("Cannot create quotation: No customer found in database");
     }
 
+    if (currentUser?.role === "SALES_REP") {
+      if (targetCustomer.ownerId && targetCustomer.ownerId !== currentUser.id) {
+        throw new Error("Unauthorized: Sales Representatives can only create quotations for customers assigned to their account");
+      }
+    }
+
     targetCustomerId = targetCustomer.id;
-    const owner = await resolveAuthenticatedOwner();
-    targetOwnerId = owner.id;
+    targetOwnerId = targetCustomer.ownerId || currentUser?.id || (await resolveAuthenticatedOwner()).id;
   }
 
   const nextNum = await getNextQuotationNumber();
@@ -205,6 +228,24 @@ export async function createNewQuotationAction(customerId?: string) {
       riskScore: 10,
     },
   });
+
+  await prisma.auditLog.create({
+    data: {
+      entity: "Quotation",
+      entityId: quote.id,
+      action: "QUOTATION_CREATED",
+      actorId: currentUser?.id || null,
+      actorEmail: currentUser?.email || null,
+      fromState: null,
+      toState: "DRAFT",
+      metadata: {
+        role: currentUser?.role || "SYSTEM",
+        customerId: targetCustomerId,
+        quotationNumber: quote.quotationNumber,
+        creatorName: currentUser?.name || "Customer Representative",
+      },
+    },
+  }).catch(() => null);
 
   safeRevalidateQuote(quote.id);
   return { success: true, id: quote.id, quotationNumber: quote.quotationNumber };
@@ -229,8 +270,12 @@ export async function createQuotationWithDetailsAction(input: unknown) {
       throw new Error("Unauthorized: Customer users cannot create quotations for other organizations");
     }
 
+    if (!authCustomer.ownerId) {
+      throw new Error("Cannot create quotation: Customer organization has no assigned internal account owner");
+    }
+
     targetCustomerId = authCustomer.id;
-    targetOwnerId = authCustomer.ownerId || (await resolveAuthenticatedOwner()).id;
+    targetOwnerId = authCustomer.ownerId;
   } else {
     // Internal sales rep / employee flow
     const customer = await prisma.customer.findUnique({
@@ -241,9 +286,14 @@ export async function createQuotationWithDetailsAction(input: unknown) {
       throw new Error("Selected customer not found in database");
     }
 
+    if (currentUser?.role === "SALES_REP") {
+      if (customer.ownerId && customer.ownerId !== currentUser.id) {
+        throw new Error("Unauthorized: Sales Representatives can only create quotations for customers assigned to their account");
+      }
+    }
+
     targetCustomerId = customer.id;
-    const owner = await resolveAuthenticatedOwner();
-    targetOwnerId = owner.id;
+    targetOwnerId = customer.ownerId || currentUser?.id || (await resolveAuthenticatedOwner()).id;
   }
 
   const nextNum = await getNextQuotationNumber();
@@ -291,6 +341,24 @@ export async function createQuotationWithDetailsAction(input: unknown) {
     const { recalculateQuoteTotalsAndRisk } = await import("@/lib/services/quoteService");
     await recalculateQuoteTotalsAndRisk(quote.id);
   }
+
+  await prisma.auditLog.create({
+    data: {
+      entity: "Quotation",
+      entityId: quote.id,
+      action: "QUOTATION_CREATED",
+      actorId: currentUser?.id || null,
+      actorEmail: currentUser?.email || null,
+      fromState: null,
+      toState: "DRAFT",
+      metadata: {
+        role: currentUser?.role || "SYSTEM",
+        customerId: targetCustomerId,
+        quotationNumber: quote.quotationNumber,
+        creatorName: currentUser?.name || "Customer Representative",
+      },
+    },
+  }).catch(() => null);
 
   safeRevalidateQuote(quote.id);
   return {

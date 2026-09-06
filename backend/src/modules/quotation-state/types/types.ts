@@ -35,9 +35,12 @@ export function normalizeState(stateStr: string): QuotationState | null {
 
   const lookup: Record<string, QuotationState> = {
     draft: QuotationState.Draft,
+    drafting: QuotationState.Draft,
     submitted: QuotationState.Submitted,
+    pendingapproval: QuotationState.Submitted,
     pendingmanager: QuotationState.PendingManager,
     pendingfinance: QuotationState.PendingFinance,
+    inreview: QuotationState.PendingManager,
     approved: QuotationState.Approved,
     rejected: QuotationState.Rejected,
     returnedforrevision: QuotationState.ReturnedForRevision,
@@ -167,9 +170,15 @@ export const STATE_TRANSITIONS_CONFIG: Record<QuotationState, StateTransitionCon
     description: "Pending Stage 2 finance review and decision",
   },
   [QuotationState.Approved]: {
-    allowedTargets: [QuotationState.Reserved, QuotationState.Cancelled],
+    allowedTargets: [
+      QuotationState.Reserved,
+      QuotationState.Cancelled,
+      QuotationState.Submitted,
+      QuotationState.PendingManager,
+      QuotationState.Draft,
+    ],
     allowedRoles: ["ADMIN", "SALES_REP", "MANAGER", "FINANCE"],
-    description: "Quotation formally approved; ready for inventory reservation",
+    description: "Quotation formally approved; allows reapproval/reopening when material terms change",
   },
   [QuotationState.Rejected]: {
     allowedTargets: [QuotationState.ReturnedForRevision],

@@ -69,7 +69,8 @@ async function runHardeningSuite() {
 
     // 4. Counterfactual Simulations
     console.log("\n--- 4. COUNTERFACTUAL SIMULATION ENGINE ---");
-    const recs = await getCounterfactualRecommendations(quoteId);
+    const rawRecs = await getCounterfactualRecommendations(quoteId);
+    const recs = Array.isArray(rawRecs) ? rawRecs : (rawRecs?.recommendations || []);
     assert(recs.length > 0, "Counterfactual recommendations generated", `Recommendations: ${recs.length}`);
     assert(recs[0].marginImprovement > 0, "Projected margin improvement calculated", `+${recs[0].marginImprovement}%`);
 

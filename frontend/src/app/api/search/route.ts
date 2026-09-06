@@ -8,8 +8,10 @@ export const dynamic = "force-dynamic";
 export async function GET(req: NextRequest) {
   try {
     const session = await auth();
-    const isCustomer = session?.user?.role === "CUSTOMER";
-    const authCustomer = isCustomer ? await getAuthoritativeCustomerForSession(session?.user) : null;
+    const user = session?.user;
+    const isCustomer = user?.role === "CUSTOMER";
+    const isSalesRep = user?.role === "SALES_REP";
+    const authCustomer = isCustomer ? await getAuthoritativeCustomerForSession(user) : null;
 
     const { searchParams } = new URL(req.url);
     const query = searchParams.get("q")?.trim();
@@ -18,15 +20,63 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ results: [] });
     }
 
-    const quoteWhere: any = isCustomer && authCustomer
+    let quoteWhere: any;
+    if (isCustomer && authCustomer) {
+      quoteWhere = {
+        customerId: authCustomer.id,
+        quotationNumber: { contains: query, mode: "insensitive" },
+      };
+    } else if (isSalesRep && user?.id) {
+      quoteWhere = {
+        AND: [
+          {
+            OR: [
+              { quotationNumber: { contains: query, mode: "insensitive" } },
+              { customer: { name: { contains: query, mode: "insensitive" } } },
+              { customer: { customerNumber: { contains: query, mode: "insensitive" } } },
+            ],
+          },
+          {
+            OR: [
+              { customer: { ownerId: user.id } },
+              { customer: { ownerId: null }, ownerId: user.id },
+            ],
+          },
+        ],
+      };
+    } else {
+      quoteWhere = {
+        OR: [
+          { quotationNumber: { contains: query, mode: "insensitive" } },
+          { customer: { name: { contains: query, mode: "insensitive" } } },
+          { customer: { customerNumber: { contains: query, mode: "insensitive" } } },
+        ],
+      };
+    }
+
+    const customerWhere: any = isSalesRep && user?.id
       ? {
-          customerId: authCustomer.id,
-          quotationNumber: { contains: query, mode: "insensitive" },
+          AND: [
+            {
+              OR: [
+                { name: { contains: query, mode: "insensitive" } },
+                { industry: { contains: query, mode: "insensitive" } },
+                { customerNumber: { contains: query, mode: "insensitive" } },
+              ],
+            },
+            {
+              OR: [
+                { ownerId: user.id },
+                { ownerId: null },
+              ],
+            },
+          ],
         }
       : {
           OR: [
-            { quotationNumber: { contains: query, mode: "insensitive" } },
-            { customer: { name: { contains: query, mode: "insensitive" } } },
+            { name: { contains: query, mode: "insensitive" } },
+            { industry: { contains: query, mode: "insensitive" } },
+            { customerNumber: { contains: query, mode: "insensitive" } },
           ],
         };
 
@@ -48,12 +98,7 @@ export async function GET(req: NextRequest) {
       isCustomer
         ? Promise.resolve([]) // Never expose other customer organizations to CUSTOMER role
         : prisma.customer.findMany({
-            where: {
-              OR: [
-                { name: { contains: query, mode: "insensitive" } },
-                { industry: { contains: query, mode: "insensitive" } },
-              ],
-            },
+            where: customerWhere,
             take: 5,
           }),
     ]);

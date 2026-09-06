@@ -44,28 +44,98 @@ export async function getNextCustomerNumberAction(): Promise<string> {
   return getNextCustomerNumber();
 }
 
-async function resolveAuthenticatedOwner() {
-  try {
-    const sessionUser = await getCurrentUser();
-    if (sessionUser?.email) {
-      const user = await prisma.user.findUnique({
-        where: { email: sessionUser.email },
-      });
-      if (user) return user;
-    }
-  } catch {
-    // Session retrieval outside Next request context
+export async function getAccountOwnersAction() {
+  const sessionUser = await getCurrentUser();
+  if (sessionUser?.role === "CUSTOMER") {
+    return [];
   }
 
-  const fallback =
-    (await prisma.user.findFirst({
-      where: { email: "arjun.mehta@dealflow360.in" },
-    })) ?? (await prisma.user.findFirst());
+  const owners = await prisma.user.findMany({
+    where: {
+      role: { in: ["SALES_REP", "MANAGER", "ADMIN"] },
+    },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      role: true,
+      title: true,
+      territory: true,
+    },
+    orderBy: { name: "asc" },
+  });
 
-  if (!fallback) {
-    throw new Error("Cannot create customer: No active user found in database");
+  return owners;
+}
+
+export async function updateCustomerOwnerAction(customerId: string, newOwnerId: string) {
+  const sessionUser = await getCurrentUser();
+  if (sessionUser?.role === "CUSTOMER") {
+    return {
+      success: false,
+      error: "Unauthorized: Customer portal users cannot reassign customer account ownership.",
+    };
   }
-  return fallback;
+
+  const customer = await prisma.customer.findUnique({
+    where: { id: customerId },
+    include: {
+      owner: { select: { id: true, name: true, email: true, role: true } },
+    },
+  });
+
+  if (!customer) {
+    return { success: false, error: "Customer not found in database." };
+  }
+
+  const newOwner = await prisma.user.findUnique({
+    where: { id: newOwnerId },
+    select: { id: true, name: true, email: true, role: true },
+  });
+
+  if (!newOwner) {
+    return { success: false, error: "Selected new account owner does not exist in database." };
+  }
+
+  const AUTHORIZED_OWNER_ROLES = ["SALES_REP", "MANAGER", "ADMIN"];
+  if (!AUTHORIZED_OWNER_ROLES.includes(newOwner.role)) {
+    return {
+      success: false,
+      error: `Invalid Account Owner: Users with role '${newOwner.role}' are not authorized to own customer accounts.`,
+    };
+  }
+
+  const previousOwner = customer.owner;
+
+  await prisma.$transaction(async (tx) => {
+    await tx.customer.update({
+      where: { id: customerId },
+      data: { ownerId: newOwner.id },
+    });
+
+    await tx.auditLog.create({
+      data: {
+        entity: "Customer",
+        entityId: customer.id,
+        action: "CUSTOMER_OWNER_CHANGED",
+        actorId: sessionUser?.id || null,
+        actorEmail: sessionUser?.email || null,
+        fromState: previousOwner?.id || null,
+        toState: newOwner.id,
+        metadata: {
+          customerNumber: customer.customerNumber,
+          customerName: customer.name,
+          previousOwner: previousOwner
+            ? { id: previousOwner.id, name: previousOwner.name, email: previousOwner.email, role: previousOwner.role }
+            : null,
+          newOwner: { id: newOwner.id, name: newOwner.name, email: newOwner.email, role: newOwner.role },
+        },
+      },
+    });
+  });
+
+  safeRevalidate();
+  return { success: true, newOwner };
 }
 
 export async function createCustomerAction(input: unknown) {
@@ -79,7 +149,26 @@ export async function createCustomerAction(input: unknown) {
     }
 
     const parsed = CreateCustomerSchema.parse(input);
-    const owner = await resolveAuthenticatedOwner();
+
+    // Validate that selected owner exists and is authorized
+    const owner = await prisma.user.findUnique({
+      where: { id: parsed.ownerId },
+    });
+
+    if (!owner) {
+      return {
+        success: false,
+        error: "Invalid Account Owner: Selected representative does not exist in database.",
+      };
+    }
+
+    const AUTHORIZED_OWNER_ROLES = ["SALES_REP", "MANAGER", "ADMIN"];
+    if (!AUTHORIZED_OWNER_ROLES.includes(owner.role)) {
+      return {
+        success: false,
+        error: `Invalid Account Owner: Users with role '${owner.role}' are not authorized to own customer accounts.`,
+      };
+    }
 
     const normalizedEmail = normalizeEmail(parsed.contactEmail);
     const normalizedPhone = normalizePhone(parsed.contactPhone);
@@ -144,13 +233,33 @@ export async function createCustomerAction(input: unknown) {
           entity: "Customer",
           entityId: customer.id,
           action: "CUSTOMER_REGISTRATION",
-          actorId: owner.id,
-          actorEmail: owner.email,
+          actorId: sessionUser?.id || owner.id,
+          actorEmail: sessionUser?.email || owner.email,
           metadata: {
             customerNumber: customer.customerNumber,
             customerName: customer.name,
             contactEmail: normalizedEmail,
             portalAccessEnabled: parsed.portalAccessEnabled ?? true,
+          },
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          entity: "Customer",
+          entityId: customer.id,
+          action: "CUSTOMER_OWNER_ASSIGNED",
+          actorId: sessionUser?.id || owner.id,
+          actorEmail: sessionUser?.email || owner.email,
+          fromState: null,
+          toState: owner.id,
+          metadata: {
+            customerNumber: customer.customerNumber,
+            customerName: customer.name,
+            ownerId: owner.id,
+            ownerName: owner.name,
+            ownerEmail: owner.email,
+            ownerRole: owner.role,
           },
         },
       });

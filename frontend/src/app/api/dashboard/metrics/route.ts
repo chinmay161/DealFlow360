@@ -1,11 +1,28 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { auth } from "@/auth";
+import { getAuthoritativeCustomerForSession } from "@/lib/services/portalAuthService";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
+    const session = await auth();
+    const currentUser = session?.user;
+
+    const where: any = {};
+    if (currentUser?.role === "CUSTOMER") {
+      const authCustomer = await getAuthoritativeCustomerForSession(currentUser);
+      where.customerId = authCustomer?.id || currentUser.customerId;
+    } else if (currentUser?.role === "SALES_REP" && currentUser.id) {
+      where.OR = [
+        { ownerId: currentUser.id },
+        { customer: { ownerId: currentUser.id } },
+      ];
+    }
+
     const quotations = await prisma.quotation.findMany({
+      where,
       include: {
         customer: { select: { name: true, tier: true } },
         owner: { select: { name: true, email: true } },
@@ -56,6 +73,7 @@ export async function GET() {
     ];
 
     const recentActivity = quotations.slice(0, 8).map((q, idx) => {
+      const isDraft = q.status === "DRAFT";
       const isApproved = q.status === "APPROVED";
       const isPending = q.status === "IN_REVIEW";
       const isRejected = q.status === "REJECTED";
@@ -66,6 +84,8 @@ export async function GET() {
         ? "REJECTED"
         : isPending
         ? "APPROVAL_STARTED"
+        : isDraft
+        ? "DRAFT_CREATED"
         : "CREATED";
 
       const title = isApproved
@@ -74,6 +94,8 @@ export async function GET() {
         ? `Quotation #${q.quotationNumber} Rejected`
         : isPending
         ? `Rule Engine Evaluation Completed for #${q.quotationNumber}`
+        : isDraft
+        ? `Quotation Draft #${q.quotationNumber} Created`
         : `New Quotation #${q.quotationNumber} Created`;
 
       const description = isApproved
@@ -82,7 +104,7 @@ export async function GET() {
         ? `Concession limit exceeded on line items for ${q.customer.name}.`
         : isPending
         ? `Escalated to Manager review with Risk Score of ${q.riskScore ?? 58}/100.`
-        : `Prepared for ${q.customer.name} under ${q.customer.tier} tier terms.`;
+        : `Customer draft prepared for ${q.customer.name} under ${q.customer.tier} tier terms.`;
 
       const badgeColor: any = isApproved ? "green" : isRejected ? "red" : isPending ? "yellow" : "blue";
 

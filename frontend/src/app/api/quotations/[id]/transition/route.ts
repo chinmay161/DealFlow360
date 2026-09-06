@@ -75,27 +75,109 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
       console.warn("[transition] Backend state machine not reachable, executing local transition:", backendErr);
     }
 
-    // 2. Map targetState to QuotationStatus
+    if (backendSuccess) {
+      const refreshed = await prisma.quotation.findUnique({
+        where: { id: quote.id },
+      });
+      if (refreshed) {
+        return NextResponse.json({
+          success: true,
+          newState: refreshed.status,
+          currentStage: refreshed.currentStage,
+          quotationNumber: refreshed.quotationNumber,
+          backendSynced: true,
+          details: backendResponse,
+        });
+      }
+    }
+
+    // 2. Canonical local fallback when backend is offline
+    const cleanTarget = (targetState || "").toUpperCase().replace(/[\s_-]+/g, "");
+    const { evaluateQuotationRules } = await import("@/lib/services/governanceBridge");
+    const evalResult = await evaluateQuotationRules(quote.id).catch(() => null);
+
     let mappedStatus: any = "DRAFT";
-    if (ts.includes("APPROV")) mappedStatus = "APPROVED";
-    else if (ts.includes("REJECT")) mappedStatus = "REJECTED";
-    else if (ts.includes("PENDING") || ts.includes("REVIEW")) mappedStatus = "IN_REVIEW";
-    else if (ts.includes("CANCEL")) mappedStatus = "EXPIRED";
+    let targetStage = targetState;
+
+    if (cleanTarget === "APPROVED") {
+      // Direct transition to APPROVED requires zero rule failures and complete approvals
+      if (evalResult && (!evalResult.approved || evalResult.rules?.some((r: any) => r.outcome === "FAIL"))) {
+        return NextResponse.json(
+          {
+            error: "Quotation cannot be approved: mandatory governance rules report exceptions.",
+            decision: "PENDING APPROVAL",
+            riskScore: evalResult.overallRiskScore,
+          },
+          { status: 409 }
+        );
+      }
+
+      const pendingApproval = await prisma.approval.findFirst({
+        where: { quotationId: quote.id, status: "PENDING" },
+        include: { workflowSteps: true },
+      });
+
+      if (pendingApproval && pendingApproval.workflowSteps.some((s: any) => s.status === "PENDING" || s.status === "IN_PROGRESS")) {
+        return NextResponse.json(
+          { error: "Quotation cannot be approved: required workflow approval steps are still pending." },
+          { status: 409 }
+        );
+      }
+
+      mappedStatus = "APPROVED";
+      targetStage = "Approved";
+    } else if (cleanTarget.includes("REJECT")) {
+      mappedStatus = "REJECTED";
+      targetStage = "Rejected";
+    } else if (
+      cleanTarget.includes("PENDING") ||
+      cleanTarget.includes("REVIEW") ||
+      cleanTarget.includes("SUBMIT")
+    ) {
+      // Submission for review: determine if eligible for fast-track auto-approval
+      const hasViolations = evalResult && (!evalResult.approved || evalResult.rules?.some((r: any) => r.outcome === "FAIL"));
+      const isHighRisk = (evalResult?.overallRiskScore ?? quote.riskScore ?? 50) > 65;
+
+      if (!hasViolations && evalResult?.overallRiskScore != null && evalResult.overallRiskScore <= 30 && cleanTarget.includes("AUTO")) {
+        mappedStatus = "APPROVED";
+        targetStage = "Approved";
+      } else {
+        mappedStatus = "IN_REVIEW";
+        targetStage = isHighRisk ? "Finance Review" : "Manager Approval";
+      }
+    } else if (cleanTarget.includes("CANCEL")) {
+      mappedStatus = "CANCELLED";
+      targetStage = "Cancelled";
+    } else if (cleanTarget.includes("DRAFT")) {
+      mappedStatus = "DRAFT";
+      targetStage = "Drafting";
+    }
 
     // 3. Update quotation status & record transition history
     const updated = await prisma.quotation.update({
       where: { id: quote.id },
       data: {
         status: mappedStatus,
-        currentStage: targetState,
+        currentStage: targetStage,
+        riskScore: evalResult?.overallRiskScore ?? quote.riskScore ?? undefined,
       },
     });
+
+    // 4. Create or update approval record and workflow steps if in review
+    if (mappedStatus === "IN_REVIEW" || mappedStatus === "PENDING_APPROVAL") {
+      const { submitQuoteForApproval } = await import("@/lib/services/approvalService");
+      await submitQuoteForApproval(quote.id, reason || "Submitted for approval review").catch(() => null);
+    } else if (mappedStatus === "APPROVED") {
+      await prisma.approval.updateMany({
+        where: { quotationId: quote.id, status: "PENDING" },
+        data: { status: "APPROVED", resolvedAt: new Date() },
+      });
+    }
 
     // Record approval history record if user exists
     if (actorId) {
       const user = await prisma.user.findUnique({ where: { id: actorId } });
       if (user) {
-        // Find or create approval container
         let approval = await prisma.approval.findFirst({ where: { quotationId: quote.id } });
         if (!approval) {
           approval = await prisma.approval.create({
@@ -112,7 +194,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
             approvalId: approval.id,
             actorId: user.id,
             eventType: mappedStatus === "APPROVED" ? "APPROVED" : "SUBMITTED",
-            message: reason || `State transitioned from ${quote.status} to ${targetState}`,
+            message: reason || `State transitioned from ${quote.status} to ${targetStage}`,
           },
         });
       }
@@ -121,6 +203,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
     return NextResponse.json({
       success: true,
       newState: updated.status,
+      currentStage: updated.currentStage,
       quotationNumber: updated.quotationNumber,
       backendSynced: backendSuccess,
       details: backendResponse,

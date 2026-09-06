@@ -29,6 +29,7 @@ export const CreateCustomerSchema = z.object({
     .regex(/^\+91\s?\d{10}$/, "Mobile number must be a 10-digit number with +91 prefix"),
   contactTitle: z.string().max(100).optional().nullable(),
   portalAccessEnabled: z.boolean().default(true),
+  ownerId: z.string().uuid("Account Owner ID must be a valid UUID"),
 });
 
 export type CreateCustomerInput = z.infer<typeof CreateCustomerSchema>;
