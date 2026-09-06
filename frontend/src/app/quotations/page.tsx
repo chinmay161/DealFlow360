@@ -74,9 +74,6 @@ export default async function QuotationsPage({ searchParams }: QuotationsPagePro
                   href="/quotations/new"
                   className="h-9 px-4 rounded-lg bg-primary hover:bg-[#1E3A8A] text-on-primary font-label-md text-label-md font-semibold flex items-center gap-1.5 transition-colors shadow-sm"
                 >
-                  <span className="material-symbols-outlined text-base" data-icon="add">
-                    add
-                  </span>
                   <span>+ Create Quotation</span>
                 </Link>
               </div>

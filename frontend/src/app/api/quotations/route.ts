@@ -21,6 +21,7 @@ export async function GET(req: NextRequest) {
     const search = searchParams.get("search")?.trim();
     const status = searchParams.get("status")?.trim();
     const riskLevel = searchParams.get("riskLevel")?.trim();
+    const scope = searchParams.get("scope")?.trim();
     const sortBy = searchParams.get("sortBy") || "date";
     const sortOrder = searchParams.get("sortOrder") === "asc" ? "asc" : "desc";
     const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
@@ -31,7 +32,7 @@ export async function GET(req: NextRequest) {
     if (currentUser?.role === "CUSTOMER") {
       const authCustomer = await getAuthoritativeCustomerForSession(currentUser);
       where.customerId = authCustomer?.id || currentUser.customerId;
-    } else if (currentUser?.role === "SALES_REP" && currentUser.id) {
+    } else if ((scope === "mine" || scope === "assigned") && currentUser?.id) {
       where.OR = [
         { customer: { ownerId: currentUser.id } },
         { customer: { ownerId: null }, ownerId: currentUser.id },
@@ -43,12 +44,13 @@ export async function GET(req: NextRequest) {
     }
 
     if (riskLevel && riskLevel !== "ALL") {
-      if (riskLevel === "LOW") {
-        where.riskScore = { lte: 30 };
-      } else if (riskLevel === "MEDIUM") {
-        where.riskScore = { gt: 30, lte: 70 };
-      } else if (riskLevel === "HIGH") {
-        where.riskScore = { gt: 70 };
+      const normalizedRisk = riskLevel.toUpperCase();
+      if (normalizedRisk === "LOW" || normalizedRisk === "HEALTHY") {
+        where.riskScore = { lt: 40 };
+      } else if (normalizedRisk === "MEDIUM" || normalizedRisk === "ATTENTION") {
+        where.riskScore = { gte: 40, lt: 70 };
+      } else if (normalizedRisk === "HIGH" || normalizedRisk === "AT-RISK") {
+        where.riskScore = { gte: 70 };
       }
     }
 
@@ -57,6 +59,8 @@ export async function GET(req: NextRequest) {
         { quotationNumber: { contains: search, mode: "insensitive" } },
         { customer: { name: { contains: search, mode: "insensitive" } } },
         { customer: { customerNumber: { contains: search, mode: "insensitive" } } },
+        { owner: { name: { contains: search, mode: "insensitive" } } },
+        { owner: { email: { contains: search, mode: "insensitive" } } },
       ];
       if (where.OR) {
         where.AND = [

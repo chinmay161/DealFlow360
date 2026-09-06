@@ -83,8 +83,8 @@ export const QuotationsViewManager: React.FC<QuotationsViewManagerProps> = ({
         </span>
       </div>
 
-      {/* Conditionally Render Table or Kanban View */}
-      {viewMode === "table" ? (
+      {/* Conditionally Render Table or Kanban View, or Error State */}
+      {error || viewMode === "table" ? (
         <QuotationsListTable
           quotations={quotations}
           error={error}

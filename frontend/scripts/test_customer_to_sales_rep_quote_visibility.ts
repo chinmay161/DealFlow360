@@ -233,6 +233,7 @@ async function main() {
     const rohanQuotes = await getQuotations({
       id: unrelatedRep!.id,
       role: "SALES_REP",
+      scopeToOwner: true,
     });
 
     const foundInRohanWorkspace = rohanQuotes.some((q) => q.id === createdQuoteId);

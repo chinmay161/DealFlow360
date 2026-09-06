@@ -255,13 +255,14 @@ export async function getQuotations(user?: {
   id?: string;
   role?: string;
   customerId?: string;
+  scopeToOwner?: boolean;
 }): Promise<SerializedQuotationListItem[]> {
   try {
     const where: any = {};
 
     if (user?.role === "CUSTOMER" && user.customerId) {
       where.customerId = user.customerId;
-    } else if (user?.role === "SALES_REP" && user.id) {
+    } else if (user?.scopeToOwner && user.id) {
       where.OR = [
         { customer: { ownerId: user.id } },
         { customer: { ownerId: null }, ownerId: user.id },

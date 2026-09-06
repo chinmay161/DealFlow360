@@ -331,6 +331,7 @@ async function runAllTests() {
     const shivamQuotes = await getQuotations({
       id: shivam!.id,
       role: "SALES_REP",
+      scopeToOwner: true,
     });
     const shivamSeesQuote = shivamQuotes.some((q) => q.id === testQuote.id);
     if (shivamSeesQuote) {
@@ -340,13 +341,14 @@ async function runAllTests() {
     }
 
     // -------------------------------------------------------------------------
-    // REQUIREMENT 12: Previous / unrelated Sales Rep does not see it after scoping
+    // REQUIREMENT 12: Account-Scoped Rep Isolation & Reassignment Scoping
     // -------------------------------------------------------------------------
     console.log("\n--- REQUIREMENT 12: Account-Scoped Rep Isolation & Reassignment Scoping ---");
     // While owned by Shivam, Rohan should NOT see it
     const rohanQuotesBefore = await getQuotations({
       id: rohan!.id,
       role: "SALES_REP",
+      scopeToOwner: true,
     });
     const rohanSeesBefore = rohanQuotesBefore.some((q) => q.id === testQuote.id);
     if (!rohanSeesBefore) {
@@ -362,12 +364,14 @@ async function runAllTests() {
       const rohanQuotesAfter = await getQuotations({
         id: rohan!.id,
         role: "SALES_REP",
+        scopeToOwner: true,
       });
       const rohanSeesAfter = rohanQuotesAfter.some((q) => q.id === testQuote.id);
 
       const shivamQuotesAfter = await getQuotations({
         id: shivam!.id,
         role: "SALES_REP",
+        scopeToOwner: true,
       });
       const shivamSeesAfter = shivamQuotesAfter.some((q) => q.id === testQuote.id);
 
