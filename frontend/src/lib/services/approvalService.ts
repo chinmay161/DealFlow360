@@ -22,6 +22,10 @@ export async function submitQuoteForApproval(quotationId: string, notes?: string
 
   if (!quote) throw new Error(`Quotation ${quotationId} not found`);
 
+  if (!quote.lineItems || quote.lineItems.length === 0) {
+    throw new Error("A quotation must contain at least one product.");
+  }
+
   // Check for existing pending approval
   if (quote.approvals.length > 0) {
     return quote.approvals[0];

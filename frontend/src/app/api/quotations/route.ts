@@ -153,15 +153,24 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { customerId, lineItems = [], currency = "INR" } = body;
+    const { customerId, currency = "INR" } = body;
+    const rawLines = body.quotationLines ?? body.lineItems ?? [];
 
     if (!customerId) {
       return NextResponse.json({ error: "Customer is required" }, { status: 400 });
     }
 
-    if (!Array.isArray(lineItems) || lineItems.length === 0) {
-      return NextResponse.json({ error: "At least one line item is required" }, { status: 400 });
+    if (!Array.isArray(rawLines) || rawLines.length === 0) {
+      return NextResponse.json(
+        {
+          error: "A quotation must contain at least one product.",
+          message: "A quotation must contain at least one product.",
+        },
+        { status: 400 }
+      );
     }
+
+    const lineItems = rawLines;
 
     // Resolve owner (default to first Sales Rep in DB)
     const defaultOwner = await prisma.user.findFirst({

@@ -20,10 +20,30 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
       where: {
         OR: [{ id: decodedId }, { quotationNumber: decodedId }],
       },
+      include: {
+        lineItems: true,
+      },
     });
 
     if (!quote) {
       return NextResponse.json({ error: "Quotation not found" }, { status: 404 });
+    }
+
+    const ts = (targetState || "").toUpperCase();
+    const isProgressing =
+      ts.includes("SUBMIT") ||
+      ts.includes("PENDING") ||
+      ts.includes("REVIEW") ||
+      ts.includes("APPROV");
+
+    if (isProgressing && (!quote.lineItems || quote.lineItems.length === 0)) {
+      return NextResponse.json(
+        {
+          error: "A quotation must contain at least one product.",
+          message: "A quotation must contain at least one product.",
+        },
+        { status: 400 }
+      );
     }
 
     const defaultActor = await prisma.user.findFirst();
@@ -57,7 +77,6 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
 
     // 2. Map targetState to QuotationStatus
     let mappedStatus: any = "DRAFT";
-    const ts = targetState.toUpperCase();
     if (ts.includes("APPROV")) mappedStatus = "APPROVED";
     else if (ts.includes("REJECT")) mappedStatus = "REJECTED";
     else if (ts.includes("PENDING") || ts.includes("REVIEW")) mappedStatus = "IN_REVIEW";

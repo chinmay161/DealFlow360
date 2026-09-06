@@ -114,7 +114,8 @@ export async function PUT(req: NextRequest, { params }: RouteParams) {
     const { id } = await params;
     const decodedId = decodeURIComponent(id);
     const body = await req.json();
-    const { lineItems, customerId } = body;
+    const rawLines = body.quotationLines ?? body.lineItems;
+    const { customerId } = body;
 
     const existing = await prisma.quotation.findFirst({
       where: {
@@ -132,6 +133,20 @@ export async function PUT(req: NextRequest, { params }: RouteParams) {
         { status: 400 }
       );
     }
+
+    if (rawLines !== undefined) {
+      if (!Array.isArray(rawLines) || rawLines.length === 0) {
+        return NextResponse.json(
+          {
+            error: "A quotation must contain at least one product.",
+            message: "A quotation must contain at least one product.",
+          },
+          { status: 400 }
+        );
+      }
+    }
+
+    const lineItems = rawLines;
 
     // Replace line items and recalculate
     if (Array.isArray(lineItems)) {

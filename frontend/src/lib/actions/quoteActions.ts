@@ -266,6 +266,32 @@ export async function createQuotationWithDetailsAction(input: unknown) {
     },
   });
 
+  const starterProduct = await prisma.product.findFirst({
+    where: { isActive: true },
+    orderBy: { createdAt: "asc" },
+  });
+
+  if (starterProduct) {
+    await prisma.quoteLineItem.create({
+      data: {
+        quotationId: quote.id,
+        productId: starterProduct.id,
+        productName: starterProduct.name,
+        sku: starterProduct.sku,
+        quantity: 1,
+        unitPrice: starterProduct.unitPrice,
+        discountPercent: 0,
+        discountLimitPercent: 15,
+        estimatedMarginPercent: 35,
+        lineTotal: starterProduct.unitPrice,
+        governanceStatus: "AUTO_APPROVED",
+      },
+    });
+
+    const { recalculateQuoteTotalsAndRisk } = await import("@/lib/services/quoteService");
+    await recalculateQuoteTotalsAndRisk(quote.id);
+  }
+
   safeRevalidateQuote(quote.id);
   return {
     success: true,
@@ -283,6 +309,14 @@ export async function saveQuotationDraftAction(quotationId: string) {
 
   if (!quote) {
     throw new Error(`Quotation ${validId} not found`);
+  }
+
+  const lineItemCount = await prisma.quoteLineItem.count({
+    where: { quotationId: validId },
+  });
+
+  if (lineItemCount === 0) {
+    throw new Error("A quotation must contain at least one product.");
   }
 
   const { recalculateQuoteTotalsAndRisk } = await import("@/lib/services/quoteService");
