@@ -52,11 +52,11 @@ export const authConfig: NextAuthConfig = {
       if (url.startsWith("/")) {
         // Prevent open redirect attack (e.g. //attacker.com)
         if (url.startsWith("//")) {
-          return `${baseUrl}/overview`;
+          return `${baseUrl}/`;
         }
         // Never redirect back to login upon successful authentication
         if (url === "/login" || url.startsWith("/login?")) {
-          return `${baseUrl}/overview`;
+          return `${baseUrl}/`;
         }
         return `${baseUrl}${url}`;
       }
@@ -66,16 +66,16 @@ export const authConfig: NextAuthConfig = {
         const parsedUrl = new URL(url);
         if (parsedUrl.origin === baseUrl) {
           if (parsedUrl.pathname === "/login") {
-            return `${baseUrl}/overview`;
+            return `${baseUrl}/`;
           }
           return url;
         }
       } catch {
-        return `${baseUrl}/overview`;
+        return `${baseUrl}/`;
       }
 
       // Default safe landing destination
-      return `${baseUrl}/overview`;
+      return `${baseUrl}/`;
     },
     authorized({ auth, request: { nextUrl } }) {
       const isLoggedIn = !!auth?.user;
@@ -144,9 +144,9 @@ export const authConfig: NextAuthConfig = {
         return true;
       }
 
-      // If manager accesses root, redirect to manager dashboard
+      // If manager accesses root or sales dashboard, redirect to manager dashboard
       if (isLoggedIn && (auth?.user as any)?.role === "MANAGER") {
-        if (pathname === "/") {
+        if (pathname === "/" || pathname === "/dashboard") {
           return Response.redirect(new URL("/manager/dashboard", nextUrl));
         }
       }

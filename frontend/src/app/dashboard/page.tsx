@@ -21,8 +21,12 @@ export const metadata: Metadata = {
 
 export default async function DashboardPage() {
   const session = await auth();
-  if ((session?.user as any)?.role === "CUSTOMER") {
+  const userRole = (session?.user as any)?.role;
+  if (userRole === "CUSTOMER") {
     redirect("/customer/dashboard");
+  }
+  if (userRole === "MANAGER") {
+    redirect("/manager/dashboard");
   }
 
   let metrics = null;

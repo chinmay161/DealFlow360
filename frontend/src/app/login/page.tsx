@@ -15,15 +15,18 @@ export const dynamic = "force-dynamic";
 export default async function LoginPage({ searchParams }: LoginPageProps) {
   const session = await auth();
   if (session?.user) {
-    if ((session.user as any).role === "CUSTOMER") {
+    const userRole = (session.user as any).role;
+    if (userRole === "CUSTOMER") {
       redirect("/customer/dashboard");
+    } else if (userRole === "MANAGER") {
+      redirect("/manager/dashboard");
     } else {
       redirect("/dashboard");
     }
   }
 
   const params = await searchParams;
-  const callbackUrl = params?.callbackUrl || "/overview";
+  const callbackUrl = params?.callbackUrl || "/";
   const isAccessDenied = params?.error === "AccessDenied";
 
   return <LoginClient callbackUrl={callbackUrl} isAccessDenied={isAccessDenied} />;

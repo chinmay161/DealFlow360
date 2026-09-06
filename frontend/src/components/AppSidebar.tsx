@@ -57,7 +57,13 @@ export const AppSidebar: React.FC = () => {
 
   const isOverview = pathname === "/overview" || pathname.startsWith("/overview") || pathname === "/";
   const isApprovals = pathname === "/approvals" || pathname.startsWith("/approvals");
-  const isDashboard = !isApprovals && !isOverview && (pathname === "/dashboard" || pathname.startsWith("/dashboard"));
+  const isDashboard =
+    !isApprovals &&
+    !isOverview &&
+    (pathname === "/dashboard" ||
+      pathname.startsWith("/dashboard") ||
+      pathname === "/manager/dashboard" ||
+      pathname.startsWith("/manager/dashboard"));
   const isCustomers = pathname === "/customers" || pathname.startsWith("/customers");
   const isFulfillment = pathname === "/fulfillment" || pathname.startsWith("/fulfillment/");
   const isSubscriptions = pathname === "/subscriptions" || pathname.startsWith("/subscriptions/");
@@ -132,7 +138,7 @@ export const AppSidebar: React.FC = () => {
 
           {/* Dashboard Item */}
           <Link
-            href="/dashboard"
+            href={user?.role === "MANAGER" ? "/manager/dashboard" : "/dashboard"}
             className={`flex items-center gap-space-sm px-space-md py-[6px] rounded-lg transition-colors duration-150 ${
               isDashboard
                 ? "bg-surface-container-low text-primary font-title-md text-body-md font-semibold"
