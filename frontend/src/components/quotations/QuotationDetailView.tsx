@@ -50,6 +50,40 @@ export const QuotationDetailView: React.FC<QuotationDetailViewProps> = ({ quotat
     ? `Territory: ${quotation.customer.territory}`
     : "Territory: PAN-India Enterprise";
 
+  const isApproved =
+    quotation.status === "APPROVED" ||
+    quotation.status === "ACCEPTED" ||
+    quotation.status === "SENT";
+
+  const allReservations = [
+    ...(quotation.reservations || []),
+    ...(quotation.orders?.flatMap((o) => o.reservations || []) || []),
+  ];
+  const hasReservation =
+    allReservations.length > 0 ||
+    Boolean(quotation.currentStage?.toLowerCase().includes("reserved"));
+  const primaryReservation = allReservations[0];
+
+  const allShipments = quotation.orders?.flatMap((o) => o.shipments || []) || [];
+  const primaryShipment = allShipments[0];
+  const shipmentStatus = primaryShipment?.status || null;
+
+  const isPacked =
+    isApproved &&
+    hasReservation &&
+    (shipmentStatus === "PACKED" ||
+      shipmentStatus === "SHIPPED" ||
+      shipmentStatus === "IN_TRANSIT" ||
+      shipmentStatus === "DELIVERED");
+
+  const isDispatched =
+    isPacked &&
+    (shipmentStatus === "SHIPPED" ||
+      shipmentStatus === "IN_TRANSIT" ||
+      shipmentStatus === "DELIVERED");
+
+  const isDelivered = isDispatched && shipmentStatus === "DELIVERED";
+
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-background">
       {/* SCROLLABLE WORKSPACE */}
@@ -92,9 +126,15 @@ export const QuotationDetailView: React.FC<QuotationDetailViewProps> = ({ quotat
           {/* 6-Stage Quotation to Shipment Fulfillment Stepper */}
           <FulfillmentTimeline
             currentStage={
-              quotation.status === "APPROVED"
+              isDelivered
+                ? "DELIVERED"
+                : isDispatched
+                ? "SHIPPED"
+                : isPacked
+                ? "PACKED"
+                : hasReservation
                 ? "RESERVED"
-                : quotation.status === "SENT"
+                : isApproved
                 ? "APPROVED"
                 : "SUBMITTED"
             }
@@ -122,14 +162,14 @@ export const QuotationDetailView: React.FC<QuotationDetailViewProps> = ({ quotat
                 </div>
                 <span
                   className={`px-2.5 py-0.5 rounded-full text-xs font-semibold border ${
-                    quotation.status === "APPROVED" || quotation.status === "ACCEPTED" || quotation.status === "SENT"
+                    hasReservation
                       ? "bg-blue-50 text-blue-700 border-blue-200"
-                      : "bg-amber-50 text-amber-700 border-amber-200"
+                      : isApproved
+                      ? "bg-amber-50 text-amber-700 border-amber-200"
+                      : "bg-slate-100 text-slate-500 border-slate-200"
                   }`}
                 >
-                  {quotation.status === "APPROVED" || quotation.status === "ACCEPTED" || quotation.status === "SENT"
-                    ? "Reserved"
-                    : "Pending"}
+                  {hasReservation ? "Reserved" : isApproved ? "Awaiting Allocation" : "Pending Approval"}
                 </span>
               </div>
 
@@ -138,8 +178,12 @@ export const QuotationDetailView: React.FC<QuotationDetailViewProps> = ({ quotat
                   <span className="text-[10px] uppercase font-semibold text-slate-400 block">
                     Warehouse
                   </span>
-                  <span className="font-semibold text-slate-800 text-sm">Mumbai</span>
-                  <span className="font-mono text-[10px] text-slate-400 block">WH-BOM</span>
+                  <span className="font-semibold text-slate-800 text-sm">
+                    {primaryReservation?.warehouseName || (isApproved ? "Mumbai Central Hub" : "Pending Assignment")}
+                  </span>
+                  <span className="font-mono text-[10px] text-slate-400 block">
+                    {primaryReservation?.warehouseCode || (isApproved ? "WH-BOM" : "WH-TBD")}
+                  </span>
                 </div>
 
                 <div>
@@ -147,24 +191,32 @@ export const QuotationDetailView: React.FC<QuotationDetailViewProps> = ({ quotat
                     Reserved
                   </span>
                   <span className="font-mono font-bold text-sm text-blue-700">
-                    {quotation.lineItems.reduce((sum, li) => sum + li.quantity, 0) || 25} Units
+                    {hasReservation
+                      ? `${allReservations.reduce((sum, r) => sum + r.quantity, 0) || quotation.lineItems.reduce((sum, li) => sum + li.quantity, 0)} Units`
+                      : "0 Units"}
                   </span>
-                  <span className="text-[10px] text-slate-400 block">Committed Stock</span>
+                  <span className="text-[10px] text-slate-400 block">
+                    {hasReservation ? "Committed Stock" : isApproved ? "Awaiting Lock" : "Not Allocated"}
+                  </span>
                 </div>
 
                 <div>
                   <span className="text-[10px] uppercase font-semibold text-slate-400 block">
                     Status
                   </span>
-                  <span className="font-semibold text-emerald-700 text-sm">
-                    {quotation.status === "APPROVED" || quotation.status === "ACCEPTED" || quotation.status === "SENT"
-                      ? "Reserved"
-                      : "Pending Approval"}
+                  <span
+                    className={`font-semibold text-sm ${
+                      hasReservation
+                        ? "text-emerald-700"
+                        : isApproved
+                        ? "text-amber-700"
+                        : "text-slate-500"
+                    }`}
+                  >
+                    {hasReservation ? "Reserved" : isApproved ? "Pending Reservation" : "Pending Approval"}
                   </span>
                   <span className="text-[10px] text-slate-400 block">
-                    {quotation.status === "APPROVED" || quotation.status === "ACCEPTED" || quotation.status === "SENT"
-                      ? "Active Allocation"
-                      : "Review Required"}
+                    {hasReservation ? "Active Allocation" : isApproved ? "Ready for Stock Lock" : "Review Required"}
                   </span>
                 </div>
               </div>
@@ -183,14 +235,16 @@ export const QuotationDetailView: React.FC<QuotationDetailViewProps> = ({ quotat
                 </div>
                 <span
                   className={`px-2.5 py-0.5 rounded-full text-xs font-semibold border ${
-                    quotation.status === "APPROVED" || quotation.status === "ACCEPTED" || quotation.status === "SENT"
+                    primaryShipment
                       ? "bg-purple-50 text-purple-700 border-purple-200"
+                      : isPacked
+                      ? "bg-purple-50 text-purple-700 border-purple-200"
+                      : hasReservation
+                      ? "bg-amber-50 text-amber-700 border-amber-200"
                       : "bg-slate-100 text-slate-600 border-slate-200"
                   }`}
                 >
-                  {quotation.status === "APPROVED" || quotation.status === "ACCEPTED" || quotation.status === "SENT"
-                    ? "Packed"
-                    : "Pending Approval"}
+                  {primaryShipment?.status || (isPacked ? "Packed" : hasReservation ? "Awaiting Packing" : "Pending Approval")}
                 </span>
               </div>
 
@@ -200,23 +254,33 @@ export const QuotationDetailView: React.FC<QuotationDetailViewProps> = ({ quotat
                     Shipment
                   </span>
                   <span className="font-mono font-bold text-sm text-slate-900">
-                    SHP-{quotation.quotationNumber.replace(/[^0-9]/g, "") || "10042"}
+                    {primaryShipment?.shipmentNumber || (hasReservation ? `SHP-${quotation.quotationNumber.replace(/[^0-9]/g, "") || "10042"}` : "Not Dispatched")}
                   </span>
-                  <span className="text-[10px] text-slate-400 block">BlueDart Express</span>
+                  <span className="text-[10px] text-slate-400 block">
+                    {primaryShipment?.carrier || (isApproved ? "BlueDart Express" : "Logistics Partner")}
+                  </span>
                 </div>
 
                 <div>
                   <span className="text-[10px] uppercase font-semibold text-slate-400 block">
                     Status
                   </span>
-                  <span className="font-semibold text-purple-700 text-sm">
-                    {quotation.status === "APPROVED" || quotation.status === "ACCEPTED" || quotation.status === "SENT"
-                      ? "Packed"
-                      : "Pending Approval"}
+                  <span
+                    className={`font-semibold text-sm ${
+                      primaryShipment || isPacked
+                        ? "text-purple-700"
+                        : hasReservation
+                        ? "text-amber-700"
+                        : "text-slate-500"
+                    }`}
+                  >
+                    {primaryShipment?.status || (isPacked ? "Packed" : hasReservation ? "Awaiting Packing" : "Pending Approval")}
                   </span>
                   <span className="text-[10px] text-slate-400 block">
-                    {quotation.status === "APPROVED" || quotation.status === "ACCEPTED" || quotation.status === "SENT"
+                    {primaryShipment || isPacked
                       ? "Consignment Sealed"
+                      : hasReservation
+                      ? "Stock Locked / Staging"
                       : "Awaiting Clearance"}
                   </span>
                 </div>
@@ -226,14 +290,16 @@ export const QuotationDetailView: React.FC<QuotationDetailViewProps> = ({ quotat
                     Expected Delivery
                   </span>
                   <span className="font-semibold text-blue-700 text-sm">
-                    {quotation.status === "APPROVED" || quotation.status === "ACCEPTED" || quotation.status === "SENT"
-                      ? "Tomorrow"
-                      : "Post-approval"}
+                    {primaryShipment?.deliveredAt
+                      ? "Delivered"
+                      : primaryShipment?.shippedAt
+                      ? "In Transit"
+                      : isApproved
+                      ? "Post-Dispatch"
+                      : "Post-Approval"}
                   </span>
                   <span className="text-[10px] text-slate-400 block">
-                    {quotation.status === "APPROVED" || quotation.status === "ACCEPTED" || quotation.status === "SENT"
-                      ? "By 2:00 PM"
-                      : "Estimated 1-2 Days"}
+                    {primaryShipment?.trackingCode ? `Track: ${primaryShipment.trackingCode}` : "Estimated 1-2 Days"}
                   </span>
                 </div>
               </div>
@@ -243,12 +309,20 @@ export const QuotationDetailView: React.FC<QuotationDetailViewProps> = ({ quotat
           {/* Beautiful Vertical Shipment Lifecycle Timeline */}
           <ShipmentTimeline
             quotationNumber={quotation.quotationNumber}
-            shipmentNumber={`SHP-${quotation.quotationNumber.replace(/[^0-9]/g, "") || "10042"}`}
-            currentStatus={
-              quotation.status === "APPROVED" || quotation.status === "ACCEPTED" || quotation.status === "SENT"
-                ? "PACKED"
-                : "PLANNED"
+            shipmentNumber={primaryShipment?.shipmentNumber}
+            quotationStatus={quotation.status}
+            hasApprovals={quotation.approvals && quotation.approvals.length > 0}
+            hasReservation={hasReservation}
+            shipmentStatus={shipmentStatus}
+            createdAt={quotation.createdAt}
+            approvedAt={
+              quotation.approvals?.find((a) => a.status === "APPROVED")?.submittedAt ||
+              (isApproved ? quotation.updatedAt : null)
             }
+            reservedAt={primaryReservation?.createdAt}
+            packedAt={primaryShipment?.createdAt}
+            shippedAt={primaryShipment?.shippedAt}
+            deliveredAt={primaryShipment?.deliveredAt}
           />
 
           {/* Rule Engine Inventory Validation & Governance */}

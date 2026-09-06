@@ -84,6 +84,9 @@ export interface ReservationRecord {
 }
 
 export type FulfillmentTimelineStage =
+  | "Draft"
+  | "Pending Approval"
+  | "Approved"
   | "Quotation Approved"
   | "Inventory Reserved"
   | "Packed"

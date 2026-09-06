@@ -156,6 +156,52 @@ export interface SerializedOwner {
   avatarUrl: string | null;
 }
 
+export interface SerializedReservation {
+  id: string;
+  orderId: string | null;
+  quotationId: string | null;
+  warehouseId: string;
+  warehouseName?: string;
+  warehouseCode?: string;
+  productId: string;
+  productName?: string;
+  quantity: number;
+  status: string;
+  createdAt: string;
+}
+
+export interface SerializedShipmentItem {
+  id: string;
+  productId: string;
+  productName?: string;
+  sku?: string;
+  quantity: number;
+}
+
+export interface SerializedShipment {
+  id: string;
+  shipmentNumber: string;
+  orderId: string;
+  warehouseId: string;
+  warehouseName?: string;
+  warehouseCode?: string;
+  carrier: string;
+  trackingCode?: string | null;
+  status: string;
+  shippedAt?: string | null;
+  deliveredAt?: string | null;
+  createdAt: string;
+  items?: SerializedShipmentItem[];
+}
+
+export interface SerializedOrder {
+  id: string;
+  orderNumber: string;
+  status: string;
+  reservations?: SerializedReservation[];
+  shipments: SerializedShipment[];
+}
+
 export interface SerializedQuotationDetail {
   id: string;
   quotationNumber: string;
@@ -176,6 +222,8 @@ export interface SerializedQuotationDetail {
   updatedAt: string;
   lineItems: SerializedQuoteLineItem[];
   approvals: SerializedApproval[];
+  reservations?: SerializedReservation[];
+  orders?: SerializedOrder[];
 }
 
 export interface SerializedQuotationListItem {
@@ -261,119 +309,207 @@ export async function getQuotations(): Promise<SerializedQuotationListItem[]> {
 /**
  * Fetch a single quotation by quotationNumber (e.g. "Q-1042") with line items and approvals.
  */
+const quotationDetailInclude = {
+  customer: {
+    include: { contacts: true },
+  },
+  owner: true,
+  lineItems: {
+    include: { product: true },
+    orderBy: { createdAt: "asc" as const },
+  },
+  approvals: {
+    include: {
+      requestedBy: true,
+      assignedTo: true,
+      workflowSteps: {
+        include: { approver: true },
+        orderBy: { stepOrder: "asc" as const },
+      },
+    },
+    orderBy: { createdAt: "desc" as const },
+  },
+  reservations: {
+    include: {
+      warehouse: true,
+      product: true,
+    },
+    orderBy: { createdAt: "desc" as const },
+  },
+  orders: {
+    include: {
+      reservations: {
+        include: {
+          warehouse: true,
+          product: true,
+        },
+      },
+      shipments: {
+        include: {
+          warehouse: true,
+          items: {
+            include: { product: true },
+          },
+        },
+        orderBy: { createdAt: "desc" as const },
+      },
+    },
+    orderBy: { createdAt: "desc" as const },
+  },
+};
+
+function formatSerializedQuotationDetail(q: any): SerializedQuotationDetail {
+  return {
+    id: q.id,
+    quotationNumber: q.quotationNumber,
+    customerId: q.customerId,
+    customer: {
+      id: q.customer.id,
+      customerNumber: q.customer.customerNumber,
+      name: q.customer.name,
+      externalAccountId: q.customer.externalAccountId,
+      industry: q.customer.industry,
+      city: q.customer.city,
+      state: q.customer.state,
+      tier: q.customer.tier,
+      paymentTerms: q.customer.paymentTerms,
+      creditLimit: q.customer.creditLimit ? Number(q.customer.creditLimit) : null,
+      creditAvailable: q.customer.creditAvailable ? Number(q.customer.creditAvailable) : null,
+      territory: q.customer.territory,
+      contacts: q.customer.contacts?.map((c: any) => ({
+        id: c.id,
+        name: c.name,
+        email: c.email,
+        title: c.title,
+        phone: c.phone,
+        isPrimary: c.isPrimary,
+      })),
+    },
+    ownerId: q.ownerId,
+    owner: {
+      id: q.owner.id,
+      name: q.owner.name,
+      email: q.owner.email,
+      role: q.owner.role,
+      avatarUrl: q.owner.avatarUrl,
+    },
+    status: q.status,
+    currentStage: q.currentStage,
+    currency: q.currency,
+    subtotal: Number(q.subtotal),
+    discountTotal: Number(q.discountTotal),
+    taxTotal: Number(q.taxTotal),
+    totalValue: Number(q.totalValue),
+    estimatedMargin: Number(q.estimatedMargin),
+    riskScore: q.riskScore,
+    createdAt: q.createdAt.toISOString(),
+    updatedAt: q.updatedAt.toISOString(),
+    lineItems: q.lineItems.map(serializeQuoteLineItem),
+    approvals: (q.approvals || []).map((appr: any) => ({
+      id: appr.id,
+      status: appr.status,
+      priority: appr.priority,
+      currentStep: appr.currentStep,
+      submittedAt: appr.submittedAt.toISOString(),
+      requestedBy: {
+        id: appr.requestedBy.id,
+        name: appr.requestedBy.name,
+        email: appr.requestedBy.email,
+      },
+      assignedTo: appr.assignedTo
+        ? {
+            id: appr.assignedTo.id,
+            name: appr.assignedTo.name,
+            email: appr.assignedTo.email,
+          }
+        : null,
+      workflowSteps: (appr.workflowSteps || []).map((st: any) => ({
+        id: st.id,
+        stepOrder: st.stepOrder,
+        role: st.role,
+        status: st.status,
+        notes: st.notes,
+        approver: st.approver
+          ? {
+              id: st.approver.id,
+              name: st.approver.name,
+              email: st.approver.email,
+              role: st.approver.role,
+              avatarUrl: st.approver.avatarUrl,
+            }
+          : null,
+      })),
+    })),
+    reservations: (q.reservations || []).map((r: any) => ({
+      id: r.id,
+      orderId: r.orderId,
+      quotationId: r.quotationId,
+      warehouseId: r.warehouseId,
+      warehouseName: r.warehouse?.name,
+      warehouseCode: r.warehouse?.code,
+      productId: r.productId,
+      productName: r.product?.name,
+      quantity: r.quantity,
+      status: r.status,
+      createdAt: r.createdAt.toISOString(),
+    })),
+    orders: (q.orders || []).map((o: any) => ({
+      id: o.id,
+      orderNumber: o.orderNumber,
+      status: o.status,
+      reservations: (o.reservations || []).map((r: any) => ({
+        id: r.id,
+        orderId: r.orderId,
+        quotationId: r.quotationId,
+        warehouseId: r.warehouseId,
+        warehouseName: r.warehouse?.name,
+        warehouseCode: r.warehouse?.code,
+        productId: r.productId,
+        productName: r.product?.name,
+        quantity: r.quantity,
+        status: r.status,
+        createdAt: r.createdAt.toISOString(),
+      })),
+      shipments: (o.shipments || []).map((s: any) => ({
+        id: s.id,
+        shipmentNumber: s.shipmentNumber,
+        orderId: s.orderId,
+        warehouseId: s.warehouseId,
+        warehouseName: s.warehouse?.name,
+        warehouseCode: s.warehouse?.code,
+        carrier: s.carrier,
+        trackingCode: s.trackingCode,
+        status: s.status,
+        shippedAt: s.shippedAt ? s.shippedAt.toISOString() : null,
+        deliveredAt: s.deliveredAt ? s.deliveredAt.toISOString() : null,
+        createdAt: s.createdAt.toISOString(),
+        items: (s.items || []).map((item: any) => ({
+          id: item.id,
+          productId: item.productId,
+          productName: item.product?.name,
+          sku: item.product?.sku,
+          quantity: item.quantity,
+        })),
+      })),
+    })),
+  };
+}
+
+/**
+ * Fetch a single quotation by quotationNumber (e.g. "Q-1042") with line items and approvals.
+ */
 export async function getQuotationByNumber(
   quotationNumber: string
 ): Promise<SerializedQuotationDetail | null> {
   try {
     const q = await prisma.quotation.findUnique({
       where: { quotationNumber },
-      include: {
-        customer: {
-          include: { contacts: true },
-        },
-        owner: true,
-        lineItems: {
-          include: { product: true },
-          orderBy: { createdAt: "asc" },
-        },
-        approvals: {
-          include: {
-            requestedBy: true,
-            assignedTo: true,
-            workflowSteps: {
-              include: { approver: true },
-              orderBy: { stepOrder: "asc" },
-            },
-          },
-          orderBy: { createdAt: "desc" },
-        },
-      },
+      include: quotationDetailInclude,
     });
 
     if (!q) return null;
 
-    return {
-      id: q.id,
-      quotationNumber: q.quotationNumber,
-      customerId: q.customerId,
-      customer: {
-        id: q.customer.id,
-        customerNumber: q.customer.customerNumber,
-        name: q.customer.name,
-        externalAccountId: q.customer.externalAccountId,
-        industry: q.customer.industry,
-        city: q.customer.city,
-        state: q.customer.state,
-        tier: q.customer.tier,
-        paymentTerms: q.customer.paymentTerms,
-        creditLimit: q.customer.creditLimit ? Number(q.customer.creditLimit) : null,
-        creditAvailable: q.customer.creditAvailable ? Number(q.customer.creditAvailable) : null,
-        territory: q.customer.territory,
-        contacts: q.customer.contacts?.map((c) => ({
-          id: c.id,
-          name: c.name,
-          email: c.email,
-          title: c.title,
-          phone: c.phone,
-          isPrimary: c.isPrimary,
-        })),
-      },
-      ownerId: q.ownerId,
-      owner: {
-        id: q.owner.id,
-        name: q.owner.name,
-        email: q.owner.email,
-        role: q.owner.role,
-        avatarUrl: q.owner.avatarUrl,
-      },
-      status: q.status,
-      currentStage: q.currentStage,
-      currency: q.currency,
-      subtotal: Number(q.subtotal),
-      discountTotal: Number(q.discountTotal),
-      taxTotal: Number(q.taxTotal),
-      totalValue: Number(q.totalValue),
-      estimatedMargin: Number(q.estimatedMargin),
-      riskScore: q.riskScore,
-      createdAt: q.createdAt.toISOString(),
-      updatedAt: q.updatedAt.toISOString(),
-      lineItems: q.lineItems.map(serializeQuoteLineItem),
-      approvals: q.approvals.map((appr) => ({
-        id: appr.id,
-        status: appr.status,
-        priority: appr.priority,
-        currentStep: appr.currentStep,
-        submittedAt: appr.submittedAt.toISOString(),
-        requestedBy: {
-          id: appr.requestedBy.id,
-          name: appr.requestedBy.name,
-          email: appr.requestedBy.email,
-        },
-        assignedTo: appr.assignedTo
-          ? {
-              id: appr.assignedTo.id,
-              name: appr.assignedTo.name,
-              email: appr.assignedTo.email,
-            }
-          : null,
-        workflowSteps: appr.workflowSteps.map((st) => ({
-          id: st.id,
-          stepOrder: st.stepOrder,
-          role: st.role,
-          status: st.status,
-          notes: st.notes,
-          approver: st.approver
-            ? {
-                id: st.approver.id,
-                name: st.approver.name,
-                email: st.approver.email,
-                role: st.approver.role,
-                avatarUrl: st.approver.avatarUrl,
-              }
-            : null,
-        })),
-      })),
-    };
+    return formatSerializedQuotationDetail(q);
   } catch (error) {
     console.error(`[getQuotationByNumber] Database error for "${quotationNumber}":`, error);
     throw new Error("Unable to load quotations.");
@@ -399,115 +535,14 @@ export async function getQuotationWithLineItems(
     try {
       const q = await prisma.quotation.findUnique({
         where: { id: identifier },
-        include: {
-          customer: {
-            include: { contacts: true },
-          },
-          owner: true,
-          lineItems: {
-            include: { product: true },
-            orderBy: { createdAt: "asc" },
-          },
-          approvals: {
-            include: {
-              requestedBy: true,
-              assignedTo: true,
-              workflowSteps: {
-                include: { approver: true },
-                orderBy: { stepOrder: "asc" },
-              },
-            },
-            orderBy: { createdAt: "desc" },
-          },
-        },
+        include: quotationDetailInclude,
       });
 
       if (!q) {
         return null;
       }
 
-      return {
-        id: q.id,
-        quotationNumber: q.quotationNumber,
-        customerId: q.customerId,
-        customer: {
-          id: q.customer.id,
-          customerNumber: q.customer.customerNumber,
-          name: q.customer.name,
-          externalAccountId: q.customer.externalAccountId,
-          industry: q.customer.industry,
-          city: q.customer.city,
-          state: q.customer.state,
-          tier: q.customer.tier,
-          paymentTerms: q.customer.paymentTerms,
-          creditLimit: q.customer.creditLimit ? Number(q.customer.creditLimit) : null,
-          creditAvailable: q.customer.creditAvailable ? Number(q.customer.creditAvailable) : null,
-          territory: q.customer.territory,
-          contacts: q.customer.contacts?.map((c) => ({
-            id: c.id,
-            name: c.name,
-            email: c.email,
-            title: c.title,
-            phone: c.phone,
-            isPrimary: c.isPrimary,
-          })),
-        },
-        ownerId: q.ownerId,
-        owner: {
-          id: q.owner.id,
-          name: q.owner.name,
-          email: q.owner.email,
-          role: q.owner.role,
-          avatarUrl: q.owner.avatarUrl,
-        },
-        status: q.status,
-        currentStage: q.currentStage,
-        currency: q.currency,
-        subtotal: Number(q.subtotal),
-        discountTotal: Number(q.discountTotal),
-        taxTotal: Number(q.taxTotal),
-        totalValue: Number(q.totalValue),
-        estimatedMargin: Number(q.estimatedMargin),
-        riskScore: q.riskScore,
-        createdAt: q.createdAt.toISOString(),
-        updatedAt: q.updatedAt.toISOString(),
-        lineItems: q.lineItems.map(serializeQuoteLineItem),
-        approvals: q.approvals.map((appr) => ({
-          id: appr.id,
-          status: appr.status,
-          priority: appr.priority,
-          currentStep: appr.currentStep,
-          submittedAt: appr.submittedAt.toISOString(),
-          requestedBy: {
-            id: appr.requestedBy.id,
-            name: appr.requestedBy.name,
-            email: appr.requestedBy.email,
-          },
-          assignedTo: appr.assignedTo
-            ? {
-                id: appr.assignedTo.id,
-                name: appr.assignedTo.name,
-                email: appr.assignedTo.email,
-              }
-            : null,
-          workflowSteps: appr.workflowSteps.map((st) => ({
-            id: st.id,
-            stepOrder: st.stepOrder,
-            role: st.role,
-            status: st.status,
-            notes: st.notes,
-            approver: st.approver
-              ? {
-                  id: st.approver.id,
-                  name: st.approver.name,
-                  email: st.approver.email,
-                  role: st.approver.role,
-                  avatarUrl: st.approver.avatarUrl,
-                }
-              : null,
-          })),
-        })),
-      };
+      return formatSerializedQuotationDetail(q);
     } catch (error) {
       console.error(`[getQuotationWithLineItems] Database error for UUID "${identifier}":`, error);
       return null;

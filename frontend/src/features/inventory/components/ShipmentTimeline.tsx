@@ -1,5 +1,6 @@
 import React from "react";
 import {
+  FileText,
   FileCheck,
   BookmarkCheck,
   PackageCheck,
@@ -8,12 +9,260 @@ import {
   CheckCircle2,
   Clock,
   Circle,
+  AlertCircle,
 } from "lucide-react";
-import type { VerticalTimelineStep, FulfillmentTimelineStage } from "../types/inventory.types";
+import type {
+  VerticalTimelineStep,
+  FulfillmentTimelineStage,
+  ShipmentStatusType,
+} from "../types/inventory.types";
+
+export interface DeriveLifecycleParams {
+  quotationStatus?: string;
+  hasApprovals?: boolean;
+  hasReservation?: boolean;
+  shipmentStatus?: ShipmentStatusType | string | null;
+  createdAt?: string | Date | null;
+  approvedAt?: string | Date | null;
+  reservedAt?: string | Date | null;
+  packedAt?: string | Date | null;
+  shippedAt?: string | Date | null;
+  deliveredAt?: string | Date | null;
+}
+
+function formatTimestamp(d?: Date | string | null): string | undefined {
+  if (!d) return undefined;
+  const date = typeof d === "string" ? new Date(d) : d;
+  if (isNaN(date.getTime())) return undefined;
+  return date.toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  });
+}
+
+export function deriveFulfillmentLifecycleSteps(params: DeriveLifecycleParams = {}): VerticalTimelineStep[] {
+  const {
+    quotationStatus = "DRAFT",
+    hasApprovals = false,
+    hasReservation = false,
+    shipmentStatus,
+    createdAt,
+    approvedAt,
+    reservedAt,
+    packedAt,
+    shippedAt,
+    deliveredAt,
+  } = params;
+
+  const normalizedStatus = (quotationStatus || "DRAFT").toUpperCase();
+  const isSubmitted = normalizedStatus !== "DRAFT" || hasApprovals;
+  const isApproved =
+    normalizedStatus === "APPROVED" ||
+    normalizedStatus === "SENT" ||
+    normalizedStatus === "ACCEPTED";
+  const isRejected = normalizedStatus === "REJECTED";
+  const isCancelled = normalizedStatus === "CANCELLED";
+
+  const upperShipmentStatus = (shipmentStatus || "").toUpperCase();
+  const isShipmentPacked =
+    upperShipmentStatus === "PACKED" ||
+    upperShipmentStatus === "SHIPPED" ||
+    upperShipmentStatus === "IN_TRANSIT" ||
+    upperShipmentStatus === "DELIVERED";
+
+  const isShipmentDispatched =
+    upperShipmentStatus === "SHIPPED" ||
+    upperShipmentStatus === "IN_TRANSIT" ||
+    upperShipmentStatus === "DELIVERED";
+
+  const isShipmentDelivered = upperShipmentStatus === "DELIVERED";
+
+  // Business Rules & Fulfillment Constraints:
+  // A quotation cannot enter fulfillment until it has been approved.
+  // Inventory Reserved: Only after quotation is Approved.
+  // Packed: Only after reservation exists.
+  // Dispatched: Only after packing completed.
+  // In Transit: Only after dispatch.
+  // Delivered: Only after shipment completion.
+
+  // 1. Draft
+  let draftStatus: VerticalTimelineStep["status"] = "completed";
+  if (!isSubmitted) {
+    draftStatus = "current";
+  }
+
+  // 2. Pending Approval
+  let pendingApprovalStatus: VerticalTimelineStep["status"] = "pending";
+  if (isCancelled || isRejected) {
+    pendingApprovalStatus = "cancelled";
+  } else if (isApproved) {
+    pendingApprovalStatus = "completed";
+  } else if (isSubmitted) {
+    pendingApprovalStatus = "current";
+  }
+
+  // 3. Approved
+  let approvedStatus: VerticalTimelineStep["status"] = "pending";
+  if (isCancelled || isRejected) {
+    approvedStatus = "cancelled";
+  } else if (isApproved) {
+    approvedStatus = "completed";
+  }
+
+  // 4. Inventory Reserved (Constraint: Only after quotation is Approved)
+  let reservedStatus: VerticalTimelineStep["status"] = "pending";
+  if (isApproved) {
+    if (hasReservation) {
+      reservedStatus = "completed";
+    } else {
+      reservedStatus = "current";
+    }
+  }
+
+  // 5. Packed (Constraint: Only after reservation exists)
+  let packedStatus: VerticalTimelineStep["status"] = "pending";
+  if (isApproved && hasReservation) {
+    if (isShipmentPacked) {
+      packedStatus = "completed";
+    } else {
+      packedStatus = "current";
+    }
+  }
+
+  // 6. Dispatched (Constraint: Only after packing completed)
+  let dispatchedStatus: VerticalTimelineStep["status"] = "pending";
+  if (isApproved && hasReservation && isShipmentPacked) {
+    if (isShipmentDispatched) {
+      dispatchedStatus = "completed";
+    } else {
+      dispatchedStatus = "current";
+    }
+  }
+
+  // 7. In Transit (Constraint: Only after dispatch)
+  let inTransitStatus: VerticalTimelineStep["status"] = "pending";
+  if (isApproved && hasReservation && isShipmentDispatched) {
+    if (isShipmentDelivered) {
+      inTransitStatus = "completed";
+    } else {
+      inTransitStatus = "current";
+    }
+  }
+
+  // 8. Delivered (Constraint: Only after shipment completion)
+  let deliveredStatus: VerticalTimelineStep["status"] = "pending";
+  if (isApproved && hasReservation && isShipmentDelivered) {
+    deliveredStatus = "completed";
+  }
+
+  return [
+    {
+      stage: "Draft",
+      label: "Quotation Draft Created",
+      description: "Commercial proposal initiated with line items and pricing",
+      timestamp: formatTimestamp(createdAt) || (draftStatus === "current" ? "Active Draft" : undefined),
+      status: draftStatus,
+    },
+    {
+      stage: "Pending Approval",
+      label: "Pending Commercial Approval",
+      description: "Governance review for pricing, margin thresholds and policy clearance",
+      timestamp:
+        pendingApprovalStatus === "current"
+          ? "Awaiting Review"
+          : pendingApprovalStatus === "completed"
+          ? formatTimestamp(createdAt)
+          : undefined,
+      status: pendingApprovalStatus,
+    },
+    {
+      stage: "Approved",
+      label: "Commercial Proposal Approved",
+      description: "Governance clearance granted; order released for fulfillment",
+      timestamp:
+        approvedStatus === "completed"
+          ? formatTimestamp(approvedAt || createdAt)
+          : undefined,
+      status: approvedStatus,
+    },
+    {
+      stage: "Inventory Reserved",
+      label: "Stock Allocated & Locked",
+      description: "SKU quantity reserved exclusively at origin warehouse",
+      timestamp:
+        reservedStatus === "completed"
+          ? formatTimestamp(reservedAt || approvedAt || createdAt)
+          : reservedStatus === "current"
+          ? "Awaiting Allocation"
+          : undefined,
+      status: reservedStatus,
+    },
+    {
+      stage: "Packed",
+      label: "Consignment Packed & Verified",
+      description: "Items picked, barcode-verified, and packed for carrier transit",
+      timestamp:
+        packedStatus === "completed"
+          ? formatTimestamp(packedAt || reservedAt || createdAt)
+          : packedStatus === "current"
+          ? "Packing in Progress"
+          : undefined,
+      status: packedStatus,
+    },
+    {
+      stage: "Dispatched",
+      label: "Dispatched from Hub",
+      description: "Handed over to carrier partner at origin dispatch dock",
+      timestamp:
+        dispatchedStatus === "completed"
+          ? formatTimestamp(shippedAt)
+          : dispatchedStatus === "current"
+          ? "Pending Carrier Pickup"
+          : undefined,
+      status: dispatchedStatus,
+    },
+    {
+      stage: "In Transit",
+      label: "In Transit with Carrier",
+      description: "Consignment travelling via linehaul regional route",
+      timestamp:
+        inTransitStatus === "completed"
+          ? formatTimestamp(deliveredAt || shippedAt)
+          : inTransitStatus === "current"
+          ? "En Route"
+          : undefined,
+      status: inTransitStatus,
+    },
+    {
+      stage: "Delivered",
+      label: "Delivered to Customer",
+      description: "Consignment acknowledged and receipt signed by consignee",
+      timestamp:
+        deliveredStatus === "completed"
+          ? formatTimestamp(deliveredAt)
+          : undefined,
+      status: deliveredStatus,
+    },
+  ];
+}
 
 interface ShipmentTimelineProps {
   steps?: VerticalTimelineStep[];
   currentStatus?: string;
+  quotationStatus?: string;
+  hasApprovals?: boolean;
+  hasReservation?: boolean;
+  shipmentStatus?: ShipmentStatusType | string | null;
+  createdAt?: string | Date | null;
+  approvedAt?: string | Date | null;
+  reservedAt?: string | Date | null;
+  packedAt?: string | Date | null;
+  shippedAt?: string | Date | null;
+  deliveredAt?: string | Date | null;
   className?: string;
   quotationNumber?: string;
   shipmentNumber?: string;
@@ -21,77 +270,47 @@ interface ShipmentTimelineProps {
 
 export const ShipmentTimeline: React.FC<ShipmentTimelineProps> = ({
   steps,
-  currentStatus = "PACKED",
+  currentStatus,
+  quotationStatus,
+  hasApprovals,
+  hasReservation,
+  shipmentStatus,
+  createdAt,
+  approvedAt,
+  reservedAt,
+  packedAt,
+  shippedAt,
+  deliveredAt,
   className = "",
   quotationNumber,
   shipmentNumber,
 }) => {
-  // Fallback default 6 stages if no custom step array is passed
-  const defaultSteps: VerticalTimelineStep[] = [
-    {
-      stage: "Quotation Approved",
-      label: "Commercial Proposal Approved",
-      description: "Governance clearance granted; order released for fulfillment",
-      timestamp: "05 Sep 2026, 11:30 AM",
-      status: "completed",
-    },
-    {
-      stage: "Inventory Reserved",
-      label: "Stock Allocated & Locked",
-      description: "SKU quantity reserved exclusively at origin warehouse",
-      timestamp: "05 Sep 2026, 12:15 PM",
-      status: "completed",
-    },
-    {
-      stage: "Packed",
-      label: "Consignment Packed & Verified",
-      description: "Items picked, barcode-verified, and packed for carrier transit",
-      timestamp: "05 Sep 2026, 04:45 PM",
-      status: currentStatus === "PACKED" ? "current" : "completed",
-    },
-    {
-      stage: "Dispatched",
-      label: "Dispatched from Hub",
-      description: "Handed over to carrier partner at origin dispatch dock",
-      timestamp:
-        currentStatus === "SHIPPED" || currentStatus === "IN_TRANSIT" || currentStatus === "DELIVERED"
-          ? "06 Sep 2026, 09:00 AM"
-          : "Pending carrier pickup",
-      status:
-        currentStatus === "SHIPPED"
-          ? "current"
-          : currentStatus === "IN_TRANSIT" || currentStatus === "DELIVERED"
-          ? "completed"
-          : "pending",
-    },
-    {
-      stage: "In Transit",
-      label: "In Transit with Carrier",
-      description: "Consignment travelling via linehaul regional route",
-      timestamp:
-        currentStatus === "IN_TRANSIT" || currentStatus === "DELIVERED"
-          ? "06 Sep 2026, 01:20 PM"
-          : "Route movement scheduled",
-      status:
-        currentStatus === "IN_TRANSIT"
-          ? "current"
-          : currentStatus === "DELIVERED"
-          ? "completed"
-          : "pending",
-    },
-    {
-      stage: "Delivered",
-      label: "Delivered to Customer",
-      description: "Consignment acknowledged and receipt signed by consignee",
-      timestamp: currentStatus === "DELIVERED" ? "06 Sep 2026, 05:40 PM" : "Estimated 1-2 days",
-      status: currentStatus === "DELIVERED" ? "completed" : "pending",
-    },
-  ];
+  const timelineSteps =
+    steps && steps.length > 0
+      ? steps
+      : deriveFulfillmentLifecycleSteps({
+          quotationStatus,
+          hasApprovals,
+          hasReservation,
+          shipmentStatus: shipmentStatus || currentStatus,
+          createdAt,
+          approvedAt,
+          reservedAt,
+          packedAt,
+          shippedAt,
+          deliveredAt,
+        });
 
-  const timelineSteps = steps && steps.length > 0 ? steps : defaultSteps;
-
-  const getStageIcon = (stage: FulfillmentTimelineStage, _status?: VerticalTimelineStep["status"]) => {
+  const getStageIcon = (stage: FulfillmentTimelineStage, status?: VerticalTimelineStep["status"]) => {
+    if (status === "cancelled") {
+      return <AlertCircle className="w-4 h-4" />;
+    }
     switch (stage) {
+      case "Draft":
+        return <FileText className="w-4 h-4" />;
+      case "Pending Approval":
+        return <Clock className="w-4 h-4" />;
+      case "Approved":
       case "Quotation Approved":
         return <FileCheck className="w-4 h-4" />;
       case "Inventory Reserved":

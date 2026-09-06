@@ -102,8 +102,32 @@ function buildVerticalTimeline(
 
   return [
     {
-      stage: "Quotation Approved",
-      label: "Proposal Approved",
+      stage: "Draft",
+      label: "Quotation Draft Created",
+      description: "Commercial proposal initiated with line items and pricing",
+      timestamp: new Date(createdAt.getTime() - 8 * 3600 * 1000).toLocaleString("en-IN", {
+        day: "2-digit",
+        month: "short",
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+      status: "completed",
+    },
+    {
+      stage: "Pending Approval",
+      label: "Commercial Governance Review",
+      description: "Margin threshold and discount policy clearance",
+      timestamp: new Date(createdAt.getTime() - 6 * 3600 * 1000).toLocaleString("en-IN", {
+        day: "2-digit",
+        month: "short",
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+      status: "completed",
+    },
+    {
+      stage: "Approved",
+      label: "Commercial Proposal Approved",
       description: "Governance clearance granted; order released for fulfillment",
       timestamp: quoteTime,
       status: "completed",

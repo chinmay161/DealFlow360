@@ -490,6 +490,26 @@ export async function deleteDiscountPolicy(id: string, authContext?: InternalAut
   return (prisma as any).discountPolicy?.delete({ where: { id } }) ?? { success: true };
 }
 
+export async function updateDiscountPolicy(id: string, data: any, authContext?: InternalAuthContext) {
+  try {
+    const res = await fetch(`${BACKEND_URL}/api/v1/config/discount-policies/${id}`, {
+      method: "PATCH",
+      headers: getInternalHeaders(authContext),
+      body: JSON.stringify(data),
+      cache: "no-store",
+    });
+    if (res.ok) {
+      const result = await res.json();
+      return serializeDiscountPolicy(result);
+    }
+  } catch {
+    // Fallback
+  }
+
+  const updated = await ((prisma as any).discountPolicy?.update({ where: { id }, data }) ?? { id, ...data });
+  return serializeDiscountPolicy(updated);
+}
+
 export async function getApprovalRules(authContext?: InternalAuthContext) {
   try {
     const res = await fetch(`${BACKEND_URL}/api/v1/config/approval-rules`, {
@@ -545,6 +565,26 @@ export async function deleteApprovalRule(id: string, authContext?: InternalAuthC
   }
 
   return (prisma as any).approvalRule?.delete({ where: { id } }) ?? { success: true };
+}
+
+export async function updateApprovalRule(id: string, data: any, authContext?: InternalAuthContext) {
+  try {
+    const res = await fetch(`${BACKEND_URL}/api/v1/config/approval-rules/${id}`, {
+      method: "PATCH",
+      headers: getInternalHeaders(authContext),
+      body: JSON.stringify(data),
+      cache: "no-store",
+    });
+    if (res.ok) {
+      const result = await res.json();
+      return serializeApprovalRule(result);
+    }
+  } catch {
+    // Fallback
+  }
+
+  const updated = await ((prisma as any).approvalRule?.update({ where: { id }, data }) ?? { id, ...data });
+  return serializeApprovalRule(updated);
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
