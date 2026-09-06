@@ -115,7 +115,7 @@ export function QuotationTable({
     {
       key: "approvalLevel",
       header: "Approval Level",
-      render: (q) => <ApprovalBadge level={q.currentStage || "AUTO"} />,
+      render: (q) => <ApprovalBadge level={q.currentStage} status={q.status} />,
     },
     {
       key: "amount",

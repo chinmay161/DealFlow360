@@ -6,8 +6,19 @@ import { useRouter } from "next/navigation";
 import { createCustomerAction } from "@/lib/actions/customerActions";
 import { ALL_INDIAN_STATES, getCitiesForState } from "@/lib/data/indiaLocations";
 
+export interface AccountOwnerOption {
+  id: string;
+  name: string | null;
+  email: string;
+  role: string;
+  title?: string | null;
+  territory?: string | null;
+}
+
 interface CreateCustomerFormProps {
   initialCustomerNumber: string;
+  accountOwners?: AccountOwnerOption[];
+  currentUserId?: string;
 }
 
 const COMMON_INDUSTRIES = [
@@ -32,8 +43,35 @@ const COMMON_TIERS = [
 
 export const CreateCustomerForm: React.FC<CreateCustomerFormProps> = ({
   initialCustomerNumber,
+  accountOwners = [],
+  currentUserId,
 }) => {
   const router = useRouter();
+
+  // Owners list & selected owner
+  const [ownersList, setOwnersList] = useState<AccountOwnerOption[]>(accountOwners);
+  const [ownerId, setOwnerId] = useState<string>(() => {
+    if (currentUserId && accountOwners.some((o) => o.id === currentUserId)) {
+      return currentUserId;
+    }
+    return accountOwners[0]?.id || "";
+  });
+
+  React.useEffect(() => {
+    if (accountOwners.length === 0) {
+      import("@/lib/actions/customerActions").then(({ getAccountOwnersAction }) => {
+        getAccountOwnersAction().then((fetched) => {
+          setOwnersList(fetched);
+          if (!ownerId && fetched.length > 0) {
+            const defaultId = currentUserId && fetched.some((o) => o.id === currentUserId)
+              ? currentUserId
+              : fetched[0].id;
+            setOwnerId(defaultId);
+          }
+        });
+      });
+    }
+  }, [accountOwners, currentUserId, ownerId]);
 
   // Form states
   const [customerNumber] = useState(initialCustomerNumber);
@@ -81,6 +119,11 @@ export const CreateCustomerForm: React.FC<CreateCustomerFormProps> = ({
       return;
     }
 
+    if (!ownerId) {
+      setErrorMsg("Please select an Account Owner / Sales Representative.");
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -100,6 +143,7 @@ export const CreateCustomerForm: React.FC<CreateCustomerFormProps> = ({
         contactPhone: `+91 ${cleanDigits}`,
         contactTitle: contactTitle.trim() || null,
         portalAccessEnabled,
+        ownerId,
       });
 
       if (res.success && res.customer) {
@@ -202,6 +246,28 @@ export const CreateCustomerForm: React.FC<CreateCustomerFormProps> = ({
                   placeholder="e.g. Tata Advanced Systems Ltd."
                   className="w-full h-10 px-3 rounded-md bg-white border border-[#D1D5DB] text-on-surface text-xs focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
                 />
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="block text-xs font-semibold text-on-surface mb-1.5">
+                  Account Owner / Sales Representative <span className="text-error">*</span>
+                </label>
+                <select
+                  required
+                  value={ownerId}
+                  onChange={(e) => setOwnerId(e.target.value)}
+                  className="w-full h-10 px-3 rounded-md bg-white border border-[#D1D5DB] text-on-surface text-xs focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary font-medium"
+                >
+                  <option value="" disabled>-- Select internal account representative --</option>
+                  {ownersList.map((owner) => (
+                    <option key={owner.id} value={owner.id}>
+                      {owner.name || owner.email} — {owner.title || owner.role} · {owner.email}{owner.territory ? ` (${owner.territory})` : ""}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[11px] text-outline mt-1">
+                  Designated internal sales representative responsible for this enterprise customer account and its commercial quotations.
+                </p>
               </div>
             </div>
           </div>

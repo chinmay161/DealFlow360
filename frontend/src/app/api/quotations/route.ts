@@ -1,11 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { Decimal } from "@prisma/client/runtime/library";
+import { auth } from "@/auth";
+import { getAuthoritativeCustomerForSession } from "@/lib/services/portalAuthService";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   try {
+    const session = await auth();
+    const currentUser = session?.user;
+
     const { searchParams } = new URL(req.url);
     const search = searchParams.get("search")?.trim();
     const status = searchParams.get("status")?.trim();
@@ -16,6 +22,16 @@ export async function GET(req: NextRequest) {
     const pageSize = Math.min(100, Math.max(1, parseInt(searchParams.get("pageSize") || "10", 10)));
 
     const where: any = {};
+
+    if (currentUser?.role === "CUSTOMER") {
+      const authCustomer = await getAuthoritativeCustomerForSession(currentUser);
+      where.customerId = authCustomer?.id || currentUser.customerId;
+    } else if (currentUser?.role === "SALES_REP" && currentUser.id) {
+      where.OR = [
+        { customer: { ownerId: currentUser.id } },
+        { customer: { ownerId: null }, ownerId: currentUser.id },
+      ];
+    }
 
     if (status && status !== "ALL") {
       where.status = status;
@@ -32,10 +48,20 @@ export async function GET(req: NextRequest) {
     }
 
     if (search) {
-      where.OR = [
+      const searchCondition = [
         { quotationNumber: { contains: search, mode: "insensitive" } },
         { customer: { name: { contains: search, mode: "insensitive" } } },
+        { customer: { customerNumber: { contains: search, mode: "insensitive" } } },
       ];
+      if (where.OR) {
+        where.AND = [
+          { OR: searchCondition },
+          { OR: where.OR },
+        ];
+        delete where.OR;
+      } else {
+        where.OR = searchCondition;
+      }
     }
 
     let orderBy: any = { createdAt: sortOrder };
@@ -152,30 +178,91 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const { customerId, lineItems = [], currency = "INR" } = body;
+    const session = await auth();
+    const currentUser = session?.user;
 
-    if (!customerId) {
+    const body = await req.json();
+    const { customerId: requestedCustomerId, lineItems = [], currency = "INR" } = body;
+
+    if (!requestedCustomerId) {
       return NextResponse.json({ error: "Customer is required" }, { status: 400 });
+    }
+
+    let targetCustomerId = requestedCustomerId;
+    let targetOwnerId: string | null = null;
+
+    if (currentUser?.role === "CUSTOMER") {
+      const authCustomer = await getAuthoritativeCustomerForSession(currentUser);
+      if (!authCustomer) {
+        return NextResponse.json(
+          { error: "Unauthorized: Customer organization profile could not be verified" },
+          { status: 403 }
+        );
+      }
+      if (requestedCustomerId && requestedCustomerId !== authCustomer.id) {
+        return NextResponse.json(
+          { error: "Unauthorized: Customer users cannot create quotations for other organizations" },
+          { status: 403 }
+        );
+      }
+      if (!authCustomer.ownerId) {
+        return NextResponse.json(
+          { error: "Cannot create quotation: Customer organization has no assigned internal account owner" },
+          { status: 400 }
+        );
+      }
+      targetCustomerId = authCustomer.id;
+      targetOwnerId = authCustomer.ownerId;
+    }
+
+    const customer = await prisma.customer.findUnique({
+      where: { id: targetCustomerId },
+    });
+
+    if (!customer) {
+      return NextResponse.json({ error: "Customer not found" }, { status: 404 });
+    }
+
+    if (currentUser?.role === "CUSTOMER") {
+      targetOwnerId = customer.ownerId;
+    } else if (currentUser?.role === "SALES_REP") {
+      if (customer.ownerId && customer.ownerId !== currentUser.id) {
+        return NextResponse.json(
+          { error: "Unauthorized: Sales Representatives can only create quotations for customers assigned to their account" },
+          { status: 403 }
+        );
+      }
+      targetOwnerId = customer.ownerId || currentUser.id;
+    } else {
+      targetOwnerId = customer.ownerId || currentUser?.id || null;
+    }
+
+    if (!targetOwnerId) {
+      return NextResponse.json(
+        { error: "Cannot create quotation: Customer organization has no assigned internal account owner" },
+        { status: 400 }
+      );
     }
 
     if (!Array.isArray(lineItems) || lineItems.length === 0) {
       return NextResponse.json({ error: "At least one line item is required" }, { status: 400 });
     }
 
-    // Resolve owner (default to first Sales Rep in DB)
-    const defaultOwner = await prisma.user.findFirst({
-      where: { role: "SALES_REP" },
+    // Generate unique sequential quote number safely
+    const existingQuotes = await prisma.quotation.findMany({
+      select: { quotationNumber: true },
     });
-    const ownerId = defaultOwner?.id || (await prisma.user.findFirst())?.id;
-
-    if (!ownerId) {
-      return NextResponse.json({ error: "No system user found to own quotation" }, { status: 500 });
+    let maxNum = 1000;
+    for (const q of existingQuotes) {
+      const match = q.quotationNumber.match(/^Q-(\d+)$/);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (!isNaN(num) && num > maxNum) {
+          maxNum = num;
+        }
+      }
     }
-
-    // Generate unique sequential quote number
-    const count = await prisma.quotation.count();
-    const quotationNumber = `Q-${1040 + count + 1}`;
+    const quotationNumber = `Q-${maxNum + 1}`;
 
     // Compute line item values
     let subtotal = 0;
@@ -233,8 +320,8 @@ export async function POST(req: NextRequest) {
     const createdQuotation = await prisma.quotation.create({
       data: {
         quotationNumber,
-        customerId,
-        ownerId,
+        customerId: targetCustomerId,
+        ownerId: targetOwnerId,
         status: "DRAFT",
         currentStage: "Draft Creation",
         currency,
@@ -254,6 +341,40 @@ export async function POST(req: NextRequest) {
         lineItems: true,
       },
     });
+
+    // Create persistent AuditLog entry
+    await prisma.auditLog
+      .create({
+        data: {
+          entity: "Quotation",
+          entityId: createdQuotation.id,
+          action: "QUOTATION_CREATED",
+          actorId: currentUser?.id || null,
+          actorEmail: currentUser?.email || null,
+          fromState: null,
+          toState: "DRAFT",
+          metadata: {
+            role: currentUser?.role || "CUSTOMER",
+            customerId: targetCustomerId,
+            quotationNumber: createdQuotation.quotationNumber,
+            creatorName: currentUser?.name || "Customer Representative",
+          },
+        },
+      })
+      .catch(() => null);
+
+    // Revalidate paths for real-time consistency
+    try {
+      revalidatePath("/quotations", "layout");
+      revalidatePath("/dashboard", "layout");
+      revalidatePath("/customer/quotations", "layout");
+      revalidatePath("/customer/dashboard", "layout");
+      revalidatePath("/portal/quotations", "layout");
+      revalidatePath(`/quotations/${createdQuotation.id}`);
+      revalidatePath(`/customer/quotations/${createdQuotation.id}`);
+    } catch {
+      // Safe no-op outside Next.js request context
+    }
 
     return NextResponse.json(
       {

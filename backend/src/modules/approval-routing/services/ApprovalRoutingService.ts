@@ -118,7 +118,21 @@ export class ApprovalRoutingService {
       requiredLevel = ruleResult.approvalLevel;
     }
 
-    const normalizedLevel = this.workflowService.normalizeLevel(requiredLevel ?? "AUTO_APPROVE");
+    let normalizedLevel = this.workflowService.normalizeLevel(requiredLevel ?? "AUTO_APPROVE");
+
+    // Guard: A quotation that has rule violations or is not approved MUST NOT be auto-approved
+    if (
+      (normalizedLevel === "AUTO_APPROVE" || normalizedLevel === "AUTO") &&
+      ruleResult &&
+      (!ruleResult.approved || (ruleResult.failedRules && ruleResult.failedRules.length > 0))
+    ) {
+      log.warn(
+        { quotationId, failedCount: ruleResult.failedRules?.length },
+        "Governance exception detected: Quotation cannot be auto-approved. Escalating to MANAGER review.",
+      );
+      normalizedLevel = "MANAGER";
+    }
+
     log.info({ quotationId, requiredLevel: normalizedLevel }, "Workflow approval level resolved");
 
     // ── Case A: Immediate REJECT by Rule Engine ───────────────────────────────

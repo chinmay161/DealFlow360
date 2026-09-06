@@ -29,7 +29,15 @@ export default async function QuotationsPage({ searchParams }: QuotationsPagePro
   let listError: string | null = null;
 
   try {
-    quotations = await getQuotations();
+    quotations = await getQuotations(
+      currentUser
+        ? {
+            id: currentUser.id,
+            role: currentUser.role,
+            customerId: (currentUser as any).customerId,
+          }
+        : undefined
+    );
   } catch (err) {
     console.error("[QuotationsPage] Error loading quotation list:", err);
     listError = "Unable to load quotations.";

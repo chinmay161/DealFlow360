@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { Decimal } from "@prisma/client/runtime/library";
+import { auth } from "@/auth";
+import { getAuthoritativeCustomerForSession } from "@/lib/services/portalAuthService";
 
 export const dynamic = "force-dynamic";
 
@@ -10,6 +13,9 @@ interface RouteParams {
 
 export async function GET(req: NextRequest, { params }: RouteParams) {
   try {
+    const session = await auth();
+    const currentUser = session?.user;
+
     const { id } = await params;
     const decodedId = decodeURIComponent(id);
 
@@ -44,6 +50,23 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: "Quotation not found" }, { status: 404 });
     }
 
+    // Role-based isolation checks
+    if (currentUser?.role === "CUSTOMER") {
+      const authCustomer = await getAuthoritativeCustomerForSession(currentUser);
+      if (!authCustomer || quotation.customerId !== authCustomer.id) {
+        return NextResponse.json({ error: "Quotation not found" }, { status: 404 });
+      }
+    } else if (currentUser?.role === "SALES_REP" && currentUser.id) {
+      const isAuthorizedRep =
+        quotation.ownerId === currentUser.id ||
+        quotation.customer.ownerId === currentUser.id;
+      if (!isAuthorizedRep) {
+        return NextResponse.json({ error: "Quotation not found" }, { status: 404 });
+      }
+    }
+
+    const isCustomer = currentUser?.role === "CUSTOMER";
+
     const serialized = {
       id: quotation.id,
       quotationNumber: quotation.quotationNumber,
@@ -56,6 +79,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
         paymentTerms: quotation.customer.paymentTerms,
         creditLimit: Number(quotation.customer.creditLimit),
         creditAvailable: Number(quotation.customer.creditAvailable),
+        ownerId: quotation.customer.ownerId,
       },
       ownerId: quotation.ownerId,
       owner: quotation.owner,
@@ -66,8 +90,9 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
       discountTotal: Number(quotation.discountTotal),
       taxTotal: Number(quotation.taxTotal),
       totalValue: Number(quotation.totalValue),
-      estimatedMargin: Number(quotation.estimatedMargin),
-      riskScore: quotation.riskScore,
+      // Redacted for external customer users
+      estimatedMargin: isCustomer ? null : Number(quotation.estimatedMargin),
+      riskScore: isCustomer ? null : quotation.riskScore,
       createdAt: quotation.createdAt.toISOString(),
       updatedAt: quotation.updatedAt.toISOString(),
       lineItems: quotation.lineItems.map((item) => ({
@@ -79,10 +104,10 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
         quantity: item.quantity,
         unitPrice: Number(item.unitPrice),
         discountPercent: Number(item.discountPercent),
-        discountLimitPercent: item.discountLimitPercent ? Number(item.discountLimitPercent) : null,
-        estimatedMarginPercent: item.estimatedMarginPercent ? Number(item.estimatedMarginPercent) : null,
+        discountLimitPercent: isCustomer ? null : (item.discountLimitPercent ? Number(item.discountLimitPercent) : null),
+        estimatedMarginPercent: isCustomer ? null : (item.estimatedMarginPercent ? Number(item.estimatedMarginPercent) : null),
         lineTotal: Number(item.lineTotal),
-        governanceStatus: item.governanceStatus,
+        governanceStatus: isCustomer ? null : item.governanceStatus,
         createdAt: item.createdAt.toISOString(),
         updatedAt: item.updatedAt.toISOString(),
       })),
@@ -111,6 +136,9 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
 
 export async function PUT(req: NextRequest, { params }: RouteParams) {
   try {
+    const session = await auth();
+    const currentUser = session?.user;
+
     const { id } = await params;
     const decodedId = decodeURIComponent(id);
     const body = await req.json();
@@ -120,10 +148,26 @@ export async function PUT(req: NextRequest, { params }: RouteParams) {
       where: {
         OR: [{ id: decodedId }, { quotationNumber: decodedId }],
       },
+      include: { customer: true },
     });
 
     if (!existing) {
       return NextResponse.json({ error: "Quotation not found" }, { status: 404 });
+    }
+
+    // Role-based access control
+    if (currentUser?.role === "CUSTOMER") {
+      const authCustomer = await getAuthoritativeCustomerForSession(currentUser);
+      if (!authCustomer || existing.customerId !== authCustomer.id) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+      }
+    } else if (currentUser?.role === "SALES_REP" && currentUser.id) {
+      const isAuthorizedRep =
+        existing.ownerId === currentUser.id ||
+        existing.customer.ownerId === currentUser.id;
+      if (!isAuthorizedRep) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+      }
     }
 
     if (existing.status !== "DRAFT") {
@@ -197,7 +241,7 @@ export async function PUT(req: NextRequest, { params }: RouteParams) {
       const updated = await prisma.quotation.update({
         where: { id: existing.id },
         data: {
-          customerId: customerId || existing.customerId,
+          customerId: currentUser?.role === "CUSTOMER" ? existing.customerId : (customerId || existing.customerId),
           subtotal: new Decimal(subtotal.toFixed(2)),
           discountTotal: new Decimal(discountTotal.toFixed(2)),
           taxTotal: new Decimal(taxTotal.toFixed(2)),
@@ -206,6 +250,17 @@ export async function PUT(req: NextRequest, { params }: RouteParams) {
           riskScore: calculatedRisk,
         },
       });
+
+      try {
+        revalidatePath("/quotations", "layout");
+        revalidatePath("/dashboard", "layout");
+        revalidatePath("/customer/quotations", "layout");
+        revalidatePath("/customer/dashboard", "layout");
+        revalidatePath(`/quotations/${existing.id}`);
+        revalidatePath(`/customer/quotations/${existing.id}`);
+      } catch {
+        // Safe no-op
+      }
 
       return NextResponse.json({
         id: updated.id,
@@ -224,6 +279,9 @@ export async function PUT(req: NextRequest, { params }: RouteParams) {
 
 export async function DELETE(req: NextRequest, { params }: RouteParams) {
   try {
+    const session = await auth();
+    const currentUser = session?.user;
+
     const { id } = await params;
     const decodedId = decodeURIComponent(id);
 
@@ -231,10 +289,26 @@ export async function DELETE(req: NextRequest, { params }: RouteParams) {
       where: {
         OR: [{ id: decodedId }, { quotationNumber: decodedId }],
       },
+      include: { customer: true },
     });
 
     if (!existing) {
       return NextResponse.json({ error: "Quotation not found" }, { status: 404 });
+    }
+
+    // Role-based access control
+    if (currentUser?.role === "CUSTOMER") {
+      const authCustomer = await getAuthoritativeCustomerForSession(currentUser);
+      if (!authCustomer || existing.customerId !== authCustomer.id) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+      }
+    } else if (currentUser?.role === "SALES_REP" && currentUser.id) {
+      const isAuthorizedRep =
+        existing.ownerId === currentUser.id ||
+        existing.customer.ownerId === currentUser.id;
+      if (!isAuthorizedRep) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+      }
     }
 
     if (existing.status !== "DRAFT") {
@@ -247,6 +321,15 @@ export async function DELETE(req: NextRequest, { params }: RouteParams) {
     await prisma.quotation.delete({
       where: { id: existing.id },
     });
+
+    try {
+      revalidatePath("/quotations", "layout");
+      revalidatePath("/dashboard", "layout");
+      revalidatePath("/customer/quotations", "layout");
+      revalidatePath("/customer/dashboard", "layout");
+    } catch {
+      // Safe no-op
+    }
 
     return NextResponse.json({ success: true, message: "Quotation deleted" });
   } catch (error) {

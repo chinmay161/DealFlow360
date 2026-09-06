@@ -90,11 +90,63 @@ export async function recalculateQuoteTotalsAndRisk(
   });
 
   const finalRiskScore = risk.riskScore;
-  const finalStage = quote.status === "IN_REVIEW" ? (quote.currentStage || "Finance Review") : risk.requiredStage;
+
+  // Check if material governance rule exceptions exist
+  const hasLineViolations = quote.lineItems.some((item) => {
+    const disc = Number(item.discountPercent);
+    const limit = item.discountLimitPercent ? Number(item.discountLimitPercent) : 15;
+    return disc > limit || item.governanceStatus === "FLAGGED_HIGH_DISCOUNT" || item.governanceStatus?.includes("Over Limit");
+  });
+  const hasMarginViolation = overallMarginPercent < 25.0;
+  const requiresApproval = hasLineViolations || hasMarginViolation || finalRiskScore > 30;
+
+  let newStatus = quote.status;
+  let finalStage = quote.currentStage;
+
+  // Reapproval Invalidation:
+  // If an APPROVED quotation is modified such that it violates governance rules or requires approval:
+  if (quote.status === "APPROVED" && requiresApproval) {
+    newStatus = "IN_REVIEW";
+    finalStage = finalRiskScore > 65 ? "Finance Review" : "Manager Approval";
+
+    // Invalidate existing approved workflow
+    await db.approval.updateMany({
+      where: { quotationId, status: "APPROVED" },
+      data: { status: "CANCELLED" },
+    });
+
+    // Record audit event
+    await (db as any).auditLog?.create({
+      data: {
+        entity: "Quotation",
+        entityId: quotationId,
+        action: "REAPPROVAL_MANDATED",
+        fromState: "APPROVED",
+        toState: "IN_REVIEW",
+        metadata: {
+          reason: "Approved quotation modified with discount or margin governance violation; reapproval required",
+          riskScore: finalRiskScore,
+          margin: overallMarginPercent,
+          timestamp: new Date().toISOString(),
+        },
+      },
+    }).catch(() => null);
+
+    // Create new approval requirement
+    const { submitQuoteForApproval } = await import("./approvalService");
+    await submitQuoteForApproval(quotationId, "Reapproval mandated due to post-approval discount/margin modification").catch(() => null);
+  } else if (quote.status === "IN_REVIEW" || quote.status === "PENDING_APPROVAL") {
+    finalStage = finalRiskScore > 65 ? "Finance Review" : (quote.currentStage || "Manager Approval");
+  } else if (quote.status === "DRAFT") {
+    finalStage = quote.currentStage || "Drafting";
+  } else if (quote.status === "APPROVED" && !requiresApproval) {
+    finalStage = "Approved";
+  }
 
   const updated = await db.quotation.update({
     where: { id: quotationId },
     data: {
+      status: newStatus,
       subtotal: new Decimal(subtotal.toFixed(2)),
       discountTotal: new Decimal(discountTotal.toFixed(2)),
       taxTotal: new Decimal(taxTotal.toFixed(2)),
@@ -119,6 +171,14 @@ export async function recalculateQuoteTotalsAndRisk(
       },
     },
   });
+
+  // Persist updated rule evaluations and decision trace
+  try {
+    const { evaluateQuotationRules } = await import("./governanceBridge");
+    await evaluateQuotationRules(quotationId);
+  } catch (err) {
+    // Non-fatal if offline
+  }
 
   return updated;
 }
@@ -416,9 +476,10 @@ export async function addBundleToQuote(quotationId: string, bundleType: string) 
       items.push(serializeQuoteLineItem(created));
     }
 
-    await recalculateQuoteTotalsAndRisk(quotationId, tx);
     return items;
   });
+
+  await recalculateQuoteTotalsAndRisk(quotationId);
 
   const updatedQuote = await prisma.quotation.findUnique({
     where: { id: quotationId },

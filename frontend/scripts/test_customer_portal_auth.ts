@@ -79,7 +79,7 @@ async function main() {
     assert(customer !== null, "Contact links to an authoritative Customer record");
 
     // Ensure test customer has at least one quotation to test customer isolation & viewing
-    let dummyQuote = customer.quotations[0];
+    let dummyQuote = customer.quotations.find((q) => q.quotationNumber === "Q-1088");
     if (!dummyQuote) {
       const owner = (await prisma.user.findFirst({ where: { role: "SALES_REP" } })) || (await prisma.user.findFirst());
       dummyQuote = await prisma.quotation.create({
@@ -395,6 +395,12 @@ async function main() {
     });
     assert(duplicateAccept.success === true, "Duplicate acceptance handled gracefully");
     assert(duplicateAccept.alreadyAccepted === true, "Duplicate acceptance flagged as alreadyAccepted (idempotent)");
+
+    // Restore dummyQuote back to SENT
+    await prisma.quotation.update({
+      where: { id: dummyQuote.id },
+      data: { status: QuotationStatus.SENT, currentStage: "Customer Proposal Sent" },
+    });
 
     console.log("\n================================================================================");
     console.log(` RESULTS FOR ${TEST_EMAIL}: ${passCount} PASSED | ${failCount} FAILED`);

@@ -77,12 +77,11 @@ export class RuleEvaluationService {
         })),
       });
 
-      // 3. Update quotation
+      // 3. Update quotation riskScore only (lifecycle state is governed by State Machine)
       await tx.quotation.update({
         where: { id: quotationId },
         data: {
-          riskScore: riskScore !== null ? riskScore : undefined,
-          currentStage: toApprovalState(approvalLevel),
+          riskScore: riskScore !== null ? Math.round(riskScore) : undefined,
         },
       });
     });

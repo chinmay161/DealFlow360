@@ -136,9 +136,10 @@ export class RuleEngine {
     const riskResult = results.find((r) => r.ruleId === "blended-risk");
     const overallRiskScore = riskResult ? riskResult.score : this.fallbackRiskScore(results);
 
-    // Approved if no rule explicitly failed and level isn't REJECT
+    // Approved only if no rule explicitly failed AND highestLevel is AUTO_APPROVE
+    // A quotation requiring MANAGER, FINANCE, or EXECUTIVE approval is NOT auto-approved.
     const approved =
-      failedRules.length === 0 && highestLevel !== ApprovalLevel.REJECT;
+      failedRules.length === 0 && highestLevel === ApprovalLevel.AUTO_APPROVE;
 
     // Build recommendations from failed rules' metadata
     const recommendations = this.buildRecommendations(results);
@@ -182,18 +183,18 @@ export class RuleEngine {
     if (approved && level === ApprovalLevel.AUTO_APPROVE) {
       return "Quotation auto-approved. All rules passed.";
     }
-    if (approved) {
-      return `Quotation requires ${level} approval before proceeding.`;
+    if (level === ApprovalLevel.REJECT || failCount > 0) {
+      return `Quotation requires approval review. ${failCount} rule(s) failed / flagged exceptions.`;
     }
-    return `Quotation rejected. ${failCount} rule(s) failed. Review required.`;
+    return `Quotation requires ${level} approval before proceeding.`;
   }
 
   private emptyResult(): RuleEngineResult {
     return {
-      approved: true,
-      approvalLevel: ApprovalLevel.AUTO_APPROVE,
-      overallRiskScore: 0,
-      decision: "No rules configured — auto-approved.",
+      approved: false,
+      approvalLevel: ApprovalLevel.MANAGER,
+      overallRiskScore: 50,
+      decision: "Governance evaluation unavailable — manual review required. Refusing silent auto-approval.",
       triggeredRules: [],
       failedRules: [],
       warnings: [],

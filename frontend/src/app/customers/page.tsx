@@ -19,15 +19,41 @@ export default async function CustomersPage() {
     redirect("/portal");
   }
 
-  const customers = await prisma.customer.findMany({
-    include: {
-      contacts: true,
-      quotations: {
-        select: { id: true },
+  const [customers, availableOwners] = await Promise.all([
+    prisma.customer.findMany({
+      include: {
+        contacts: true,
+        owner: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true,
+            title: true,
+            territory: true,
+          },
+        },
+        quotations: {
+          select: { id: true },
+        },
       },
-    },
-    orderBy: { createdAt: "desc" },
-  });
+      orderBy: { createdAt: "desc" },
+    }),
+    prisma.user.findMany({
+      where: {
+        role: { in: ["SALES_REP", "MANAGER", "ADMIN"] },
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        title: true,
+        territory: true,
+      },
+      orderBy: { name: "asc" },
+    }),
+  ]);
 
   const formattedCustomers = customers.map((c) => ({
     id: c.id,
@@ -44,6 +70,16 @@ export default async function CustomersPage() {
     state: c.state,
     activeStatus: (c as any).isActive ?? true,
     quotationCount: c.quotations.length,
+    owner: c.owner
+      ? {
+          id: c.owner.id,
+          name: c.owner.name,
+          email: c.owner.email,
+          role: c.owner.role,
+          title: c.owner.title,
+          territory: c.owner.territory,
+        }
+      : null,
     primaryContact: (() => {
       const cnt = c.contacts.find((cn) => cn.isPrimary) || c.contacts[0];
       return cnt
@@ -77,7 +113,7 @@ export default async function CustomersPage() {
               </div>
             </div>
 
-            <CustomerDirectoryTable customers={formattedCustomers} />
+            <CustomerDirectoryTable customers={formattedCustomers} availableOwners={availableOwners} />
           </div>
         </main>
       </div>

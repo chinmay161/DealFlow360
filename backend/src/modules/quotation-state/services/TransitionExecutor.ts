@@ -9,11 +9,41 @@
 
 import type { PrismaClient } from "@prisma/client";
 import type { ITransitionExecutor, IStateHistoryService } from "../interfaces/interfaces.js";
-import type { TransitionContext, TransitionResult } from "../types/types.js";
+import {
+  QuotationState,
+  type TransitionContext,
+  type TransitionResult,
+} from "../types/types.js";
 import { StateHistoryService } from "./StateHistoryService.js";
 import { createModuleLogger } from "../../../lib/logger.js";
 
 const log = createModuleLogger("transition-executor");
+
+function mapQuotationStateToDbStatus(state: QuotationState | string): string {
+  switch (state) {
+    case QuotationState.Draft:
+      return "DRAFT";
+    case QuotationState.Submitted:
+    case QuotationState.PendingManager:
+    case QuotationState.PendingFinance:
+      return "PENDING_APPROVAL";
+    case QuotationState.Approved:
+      return "APPROVED";
+    case QuotationState.Rejected:
+      return "REJECTED";
+    case QuotationState.ReturnedForRevision:
+      return "IN_REVIEW";
+    case QuotationState.Reserved:
+      return "APPROVED";
+    case QuotationState.Fulfilled:
+    case QuotationState.Closed:
+      return "ACCEPTED";
+    case QuotationState.Cancelled:
+      return "CANCELLED";
+    default:
+      return "DRAFT";
+  }
+}
 
 export class TransitionExecutor implements ITransitionExecutor {
   private readonly historyService: IStateHistoryService;
@@ -46,11 +76,13 @@ export class TransitionExecutor implements ITransitionExecutor {
     );
 
     return this.prisma.$transaction(async (tx) => {
-      // 1. Update quotation status
+      // 1. Update quotation status & currentStage
+      const dbStatus = mapQuotationStateToDbStatus(targetState);
       const updatedQuotation = await tx.quotation.update({
         where: { id: quotationId },
         data: {
-          status: targetState as any,
+          status: dbStatus as any,
+          currentStage: targetState,
           updatedAt: timestamp,
         },
       });

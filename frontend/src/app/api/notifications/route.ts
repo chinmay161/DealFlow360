@@ -1,11 +1,28 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { auth } from "@/auth";
+import { getAuthoritativeCustomerForSession } from "@/lib/services/portalAuthService";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
+    const session = await auth();
+    const currentUser = session?.user;
+
+    const where: any = {};
+    if (currentUser?.role === "CUSTOMER") {
+      const authCustomer = await getAuthoritativeCustomerForSession(currentUser);
+      where.customerId = authCustomer?.id || currentUser.customerId;
+    } else if (currentUser?.role === "SALES_REP" && currentUser.id) {
+      where.OR = [
+        { customer: { ownerId: currentUser.id } },
+        { customer: { ownerId: null }, ownerId: currentUser.id },
+      ];
+    }
+
     const quotes = await prisma.quotation.findMany({
+      where,
       take: 6,
       orderBy: { updatedAt: "desc" },
       include: { customer: { select: { name: true } } },
@@ -16,7 +33,11 @@ export async function GET() {
       let title = `Quotation #${q.quotationNumber} Approved`;
       let message = `Customer ${q.customer.name} quotation has been formally approved.`;
 
-      if (q.status === "REJECTED") {
+      if (q.status === "DRAFT") {
+        category = "QUOTATION_CREATED";
+        title = `New Quotation Draft #${q.quotationNumber}`;
+        message = `Customer ${q.customer.name} created quotation #${q.quotationNumber}.`;
+      } else if (q.status === "REJECTED") {
         category = "QUOTATION_REJECTED";
         title = `Quotation #${q.quotationNumber} Rejected`;
         message = `Margin tolerance exceeded for ${q.customer.name}.`;

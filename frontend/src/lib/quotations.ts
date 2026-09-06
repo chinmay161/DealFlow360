@@ -145,6 +145,7 @@ export interface SerializedCustomer {
   creditLimit?: number | null;
   creditAvailable?: number | null;
   territory?: string | null;
+  ownerId?: string | null;
   contacts?: SerializedCustomerContact[];
 }
 
@@ -200,11 +201,27 @@ export interface SerializedQuotationListItem {
 }
 
 /**
- * Fetch all quotations for list / table views.
+ * Fetch all quotations for list / table views with optional role-based scoping.
  */
-export async function getQuotations(): Promise<SerializedQuotationListItem[]> {
+export async function getQuotations(user?: {
+  id?: string;
+  role?: string;
+  customerId?: string;
+}): Promise<SerializedQuotationListItem[]> {
   try {
+    const where: any = {};
+
+    if (user?.role === "CUSTOMER" && user.customerId) {
+      where.customerId = user.customerId;
+    } else if (user?.role === "SALES_REP" && user.id) {
+      where.OR = [
+        { customer: { ownerId: user.id } },
+        { customer: { ownerId: null }, ownerId: user.id },
+      ];
+    }
+
     const records = await prisma.quotation.findMany({
+      where,
       include: {
         customer: true,
         owner: true,
@@ -230,6 +247,7 @@ export async function getQuotations(): Promise<SerializedQuotationListItem[]> {
         city: q.customer.city,
         state: q.customer.state,
         tier: q.customer.tier,
+        ownerId: q.customer.ownerId,
       },
       ownerId: q.ownerId,
       owner: {
@@ -309,6 +327,7 @@ export async function getQuotationByNumber(
         creditLimit: q.customer.creditLimit ? Number(q.customer.creditLimit) : null,
         creditAvailable: q.customer.creditAvailable ? Number(q.customer.creditAvailable) : null,
         territory: q.customer.territory,
+        ownerId: q.customer.ownerId,
         contacts: q.customer.contacts?.map((c) => ({
           id: c.id,
           name: c.name,
@@ -443,6 +462,7 @@ export async function getQuotationWithLineItems(
           creditLimit: q.customer.creditLimit ? Number(q.customer.creditLimit) : null,
           creditAvailable: q.customer.creditAvailable ? Number(q.customer.creditAvailable) : null,
           territory: q.customer.territory,
+          ownerId: q.customer.ownerId,
           contacts: q.customer.contacts?.map((c) => ({
             id: c.id,
             name: c.name,

@@ -41,11 +41,67 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
         },
       });
 
-      // Update parent approval
-      await prisma.approval.update({
-        where: { id: step.approvalId },
-        data: { status: "APPROVED" },
+      // Check if other steps in this approval are still pending
+      const remainingSteps = await prisma.approvalWorkflowStep.findMany({
+        where: {
+          approvalId: step.approvalId,
+          id: { not: step.id },
+          status: { in: ["PENDING", "IN_PROGRESS"] },
+        },
       });
+
+      const parentApproval = await prisma.approval.findUnique({
+        where: { id: step.approvalId },
+      });
+
+      if (remainingSteps.length === 0) {
+        // All steps completed: Final approval granted
+        await prisma.approval.update({
+          where: { id: step.approvalId },
+          data: { status: "APPROVED", resolvedAt: new Date() },
+        });
+
+        if (parentApproval?.quotationId) {
+          await prisma.quotation.update({
+            where: { id: parentApproval.quotationId },
+            data: {
+              status: "APPROVED",
+              currentStage: "Approved",
+            },
+          });
+        }
+      } else {
+        // Multi-stage progression: Activate next step
+        const nextStep = remainingSteps.sort((a, b) => a.stepOrder - b.stepOrder)[0];
+        await prisma.approvalWorkflowStep.update({
+          where: { id: nextStep.id },
+          data: { status: "IN_PROGRESS" },
+        });
+        await prisma.approval.update({
+          where: { id: step.approvalId },
+          data: {
+            currentStep: nextStep.stepOrder,
+            assignedToId: nextStep.approverId,
+          },
+        });
+        if (parentApproval?.quotationId) {
+          await prisma.quotation.update({
+            where: { id: parentApproval.quotationId },
+            data: {
+              currentStage: nextStep.role.includes("Finance") ? "Finance Review" : "Manager Approval",
+            },
+          });
+        }
+      }
+    } else {
+      const approval = await prisma.approval.findUnique({
+        where: { id },
+        include: { workflowSteps: true },
+      });
+      if (approval) {
+        const { approveWorkflowStep } = await import("@/lib/services/approvalService");
+        await approveWorkflowStep(approval.id, comments);
+      }
     }
 
     return NextResponse.json({ success: true, message: "Approval recorded successfully" });
