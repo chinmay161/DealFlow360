@@ -15,20 +15,116 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
     const body = await req.json().catch(() => ({}));
     const { comments } = body;
 
-    try {
-      const resp = await fetch(`${BACKEND_URL}/api/v1/approvals/${id}/reject`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ comments }),
-      });
-      if (resp.ok) {
-        return NextResponse.json({ success: true, message: "Step rejected in backend" });
+    // 1. Try resolving as Quotation (by UUID or quotationNumber)
+    const quote = await prisma.quotation.findFirst({
+      where: { OR: [{ id }, { quotationNumber: id }] },
+      include: {
+        approvals: {
+          include: {
+            workflowSteps: { orderBy: { stepOrder: "asc" } },
+          },
+          orderBy: { createdAt: "desc" },
+        },
+      },
+    });
+
+    if (quote) {
+      const approval = quote.approvals[0];
+      if (approval) {
+        await prisma.approvalWorkflowStep.updateMany({
+          where: {
+            approvalId: approval.id,
+            status: { in: ["PENDING", "IN_PROGRESS"] },
+          },
+          data: {
+            status: "REJECTED",
+            notes: comments || "Rejected by Manager",
+            completedAt: new Date(),
+          },
+        });
+
+        await prisma.approval.update({
+          where: { id: approval.id },
+          data: {
+            status: "REJECTED",
+            resolvedAt: new Date(),
+          },
+        });
+
+        await prisma.approvalHistory.create({
+          data: {
+            approvalId: approval.id,
+            eventType: "REJECTED",
+            message: comments ? `Rejected by Manager: ${comments}` : "Rejected by Manager",
+          },
+        }).catch(() => {});
       }
-    } catch {
-      // fallback
+
+      await prisma.quotation.update({
+        where: { id: quote.id },
+        data: {
+          status: "REJECTED",
+          currentStage: "Rejected",
+        },
+      });
+
+      return NextResponse.json({ success: true, message: "Quotation rejected successfully" });
     }
 
-    const step = await prisma.approvalWorkflowStep.findUnique({ where: { id } }).catch(() => null);
+    // 2. Try resolving as Approval record
+    const approval = await prisma.approval.findUnique({
+      where: { id },
+      include: { quotation: true },
+    });
+
+    if (approval) {
+      await prisma.approvalWorkflowStep.updateMany({
+        where: {
+          approvalId: approval.id,
+          status: { in: ["PENDING", "IN_PROGRESS"] },
+        },
+        data: {
+          status: "REJECTED",
+          notes: comments || "Rejected by Manager",
+          completedAt: new Date(),
+        },
+      });
+
+      await prisma.approval.update({
+        where: { id: approval.id },
+        data: {
+          status: "REJECTED",
+          resolvedAt: new Date(),
+        },
+      });
+
+      if (approval.quotationId) {
+        await prisma.quotation.update({
+          where: { id: approval.quotationId },
+          data: {
+            status: "REJECTED",
+            currentStage: "Rejected",
+          },
+        });
+      }
+
+      await prisma.approvalHistory.create({
+        data: {
+          approvalId: approval.id,
+          eventType: "REJECTED",
+          message: comments ? `Rejected by Manager: ${comments}` : "Rejected by Manager",
+        },
+      }).catch(() => {});
+
+      return NextResponse.json({ success: true, message: "Quotation rejected successfully" });
+    }
+
+    // 3. Fallback: Try resolving as ApprovalWorkflowStep
+    const step = await prisma.approvalWorkflowStep.findUnique({
+      where: { id },
+      include: { approval: true },
+    });
+
     if (step) {
       await prisma.approvalWorkflowStep.update({
         where: { id },
@@ -41,11 +137,26 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
 
       await prisma.approval.update({
         where: { id: step.approvalId },
-        data: { status: "REJECTED" },
+        data: {
+          status: "REJECTED",
+          resolvedAt: new Date(),
+        },
       });
+
+      if (step.approval?.quotationId) {
+        await prisma.quotation.update({
+          where: { id: step.approval.quotationId },
+          data: {
+            status: "REJECTED",
+            currentStage: "Rejected",
+          },
+        });
+      }
+
+      return NextResponse.json({ success: true, message: "Step rejected successfully" });
     }
 
-    return NextResponse.json({ success: true, message: "Rejection recorded successfully" });
+    return NextResponse.json({ error: "No matching quotation or approval step found" }, { status: 404 });
   } catch (error) {
     console.error("[API reject POST] Error:", error);
     return NextResponse.json({ error: "Failed to reject step" }, { status: 500 });

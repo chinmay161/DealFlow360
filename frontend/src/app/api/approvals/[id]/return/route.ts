@@ -15,20 +15,107 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
     const body = await req.json().catch(() => ({}));
     const { comments } = body;
 
-    try {
-      const resp = await fetch(`${BACKEND_URL}/api/v1/approvals/${id}/return`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ comments }),
-      });
-      if (resp.ok) {
-        return NextResponse.json({ success: true, message: "Returned for revision in backend" });
+    // 1. Try resolving as Quotation (by UUID or quotationNumber)
+    const quote = await prisma.quotation.findFirst({
+      where: { OR: [{ id }, { quotationNumber: id }] },
+      include: {
+        approvals: {
+          include: {
+            workflowSteps: { orderBy: { stepOrder: "asc" } },
+          },
+          orderBy: { createdAt: "desc" },
+        },
+      },
+    });
+
+    if (quote) {
+      const approval = quote.approvals[0];
+      if (approval) {
+        await prisma.approvalWorkflowStep.updateMany({
+          where: {
+            approvalId: approval.id,
+            status: { in: ["PENDING", "IN_PROGRESS"] },
+          },
+          data: {
+            status: "PENDING",
+            notes: comments || "Returned for revision by Manager",
+          },
+        });
+
+        await prisma.approval.update({
+          where: { id: approval.id },
+          data: {
+            status: "CANCELLED",
+          },
+        });
+
+        await prisma.approvalHistory.create({
+          data: {
+            approvalId: approval.id,
+            eventType: "RETURNED",
+            message: comments || "Returned for revision by Manager",
+          },
+        }).catch(() => {});
       }
-    } catch {
-      // fallback
+
+      await prisma.quotation.update({
+        where: { id: quote.id },
+        data: {
+          status: "DRAFT",
+          currentStage: "Returned for Revision",
+        },
+      });
+
+      return NextResponse.json({ success: true, message: "Quotation returned for revision" });
     }
 
-    const step = await prisma.approvalWorkflowStep.findUnique({ where: { id } }).catch(() => null);
+    // 2. Try resolving as Approval record
+    const approval = await prisma.approval.findUnique({
+      where: { id },
+      include: { quotation: true },
+    });
+
+    if (approval) {
+      await prisma.approvalWorkflowStep.updateMany({
+        where: {
+          approvalId: approval.id,
+          status: { in: ["PENDING", "IN_PROGRESS"] },
+        },
+        data: {
+          status: "PENDING",
+          notes: comments || "Returned for revision",
+        },
+      });
+
+      await prisma.approval.update({
+        where: { id: approval.id },
+        data: { status: "CANCELLED" },
+      });
+
+      if (approval.quotationId) {
+        await prisma.quotation.update({
+          where: { id: approval.quotationId },
+          data: { status: "DRAFT", currentStage: "Returned for Revision" },
+        });
+      }
+
+      await prisma.approvalHistory.create({
+        data: {
+          approvalId: approval.id,
+          eventType: "RETURNED",
+          message: comments || "Returned for revision",
+        },
+      }).catch(() => {});
+
+      return NextResponse.json({ success: true, message: "Quotation returned for revision" });
+    }
+
+    // 3. Fallback: Step
+    const step = await prisma.approvalWorkflowStep.findUnique({
+      where: { id },
+      include: { approval: true },
+    });
+
     if (step) {
       await prisma.approvalWorkflowStep.update({
         where: { id },
@@ -40,11 +127,20 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
 
       await prisma.approval.update({
         where: { id: step.approvalId },
-        data: { status: "PENDING" },
+        data: { status: "CANCELLED" },
       });
+
+      if (step.approval?.quotationId) {
+        await prisma.quotation.update({
+          where: { id: step.approval.quotationId },
+          data: { status: "DRAFT", currentStage: "Returned for Revision" },
+        });
+      }
+
+      return NextResponse.json({ success: true, message: "Step returned for revision" });
     }
 
-    return NextResponse.json({ success: true, message: "Quotation returned for revision" });
+    return NextResponse.json({ error: "No matching quotation or approval step found" }, { status: 404 });
   } catch (error) {
     console.error("[API return POST] Error:", error);
     return NextResponse.json({ error: "Failed to return step" }, { status: 500 });
