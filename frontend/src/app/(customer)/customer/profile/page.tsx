@@ -2,7 +2,6 @@
 
 import React, { useEffect, useState } from "react";
 import { UserProfileCard } from "@/features/profile/UserProfileCard";
-import { SecuritySettings } from "@/features/profile/SecuritySettings";
 import { PreferencesCard } from "@/features/profile/PreferencesCard";
 import { profileService } from "@/services/profile.service";
 import type { UserProfile } from "@/types/user.types";
@@ -27,7 +26,7 @@ export default function ProfilePage() {
           User Profile & Preferences
         </h1>
         <p className="text-xs text-slate-500 mt-0.5">
-          Manage your commercial sales identity, authentication credentials, and notifications.
+          Manage your commercial account profile, regional preferences, and notifications.
         </p>
       </div>
 
@@ -40,7 +39,6 @@ export default function ProfilePage() {
         <div className="space-y-6">
           <UserProfileCard profile={profile} />
           <PreferencesCard preferences={profile.preferences} />
-          <SecuritySettings />
         </div>
       )}
     </div>
