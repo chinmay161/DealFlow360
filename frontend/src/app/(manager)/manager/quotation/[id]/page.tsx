@@ -159,6 +159,7 @@ export default function QuotationReviewPage({ params }: QuotationReviewPageProps
         quotationNumber={quote.quotationNumber}
         totalAmount={formatCurrency(quote.financials.totalValue, "INR")}
         customerName={quote.customer.name}
+        status={quote.status}
         canAct={quote.status !== "APPROVED" && quote.status !== "REJECTED"}
         onSuccess={() => refetch()}
       />

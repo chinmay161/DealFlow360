@@ -9,6 +9,7 @@ interface ApprovalActionsProps {
   quotationNumber: string;
   totalAmount: string;
   customerName: string;
+  status?: string;
   canAct?: boolean;
   onSuccess?: () => void;
   className?: string;
@@ -21,6 +22,7 @@ export const ApprovalActions: React.FC<ApprovalActionsProps> = ({
   quotationNumber,
   totalAmount,
   customerName,
+  status,
   canAct = true,
   onSuccess,
   className = "",
@@ -39,19 +41,23 @@ export const ApprovalActions: React.FC<ApprovalActionsProps> = ({
   const handleConfirmAction = async () => {
     if (!approvalId) return;
 
-    if (activeModal === "approve") {
-      await approveMutation.mutateAsync({ approvalId, comments });
-    } else if (activeModal === "reject") {
-      await rejectMutation.mutateAsync({ approvalId, comments: comments || "Commercial concession rejected by Manager." });
-    } else if (activeModal === "return") {
-      await returnMutation.mutateAsync({ approvalId, comments: comments || "Revision required on discounting terms." });
-    } else if (activeModal === "requestInfo") {
-      await requestInfoMutation.mutateAsync({ approvalId, query: comments || "Clarification needed on delivery schedule and customer terms." });
-    }
+    try {
+      if (activeModal === "approve") {
+        await approveMutation.mutateAsync({ approvalId, comments });
+      } else if (activeModal === "reject") {
+        await rejectMutation.mutateAsync({ approvalId, comments: comments || "Commercial concession rejected by Manager." });
+      } else if (activeModal === "return") {
+        await returnMutation.mutateAsync({ approvalId, comments: comments || "Revision required on discounting terms." });
+      } else if (activeModal === "requestInfo") {
+        await requestInfoMutation.mutateAsync({ approvalId, query: comments || "Clarification needed on delivery schedule and customer terms." });
+      }
 
-    setActiveModal(null);
-    setComments("");
-    if (onSuccess) onSuccess();
+      setActiveModal(null);
+      setComments("");
+      if (onSuccess) onSuccess();
+    } catch (err) {
+      console.error("Governance action failed:", err);
+    }
   };
 
   return (
@@ -60,66 +66,101 @@ export const ApprovalActions: React.FC<ApprovalActionsProps> = ({
       <div
         className={`sticky bottom-0 left-0 right-0 z-20 bg-white/95 backdrop-blur-md border-t border-[#D1D5DB] px-6 py-3.5 shadow-lg shadow-slate-900/10 flex items-center justify-between gap-4 ${className}`}
       >
-        <div className="flex items-center gap-3">
-          <div className="flex flex-col">
-            <span className="text-[11px] uppercase font-bold text-outline tracking-wider">
-              Governance Action Required
-            </span>
-            <span className="text-sm font-bold text-on-surface">
-              Quote #{quotationNumber} • {customerName} ({totalAmount})
-            </span>
-          </div>
-        </div>
+        {!canAct ? (
+          <>
+            <div className="flex items-center gap-3">
+              <div className="flex flex-col">
+                <span className="text-[11px] uppercase font-bold text-slate-500 tracking-wider">
+                  Governance Decision Finalized
+                </span>
+                <span className="text-sm font-bold text-on-surface">
+                  Quote #{quotationNumber} • {customerName} ({totalAmount})
+                </span>
+              </div>
+            </div>
 
-        <div className="flex items-center gap-2.5">
-          {/* Request More Info Button */}
-          <button
-            type="button"
-            onClick={() => setActiveModal("requestInfo")}
-            disabled={!canAct || isPending}
-            className="h-9 px-3.5 rounded-md border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition-colors disabled:opacity-50 cursor-pointer"
-          >
-            <HelpCircle className="h-3.5 w-3.5 text-slate-500" />
-            <span>Request Info</span>
-          </button>
+            <div className="flex items-center gap-2.5">
+              {status === "APPROVED" ? (
+                <div className="h-9 px-4 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold flex items-center gap-2 shadow-sm">
+                  <Check className="h-4 w-4 text-emerald-600 stroke-[3]" />
+                  <span>Quotation Approved • Commercial Clearance Complete</span>
+                </div>
+              ) : status === "REJECTED" ? (
+                <div className="h-9 px-4 rounded-md bg-rose-50 border border-rose-200 text-rose-800 text-xs font-bold flex items-center gap-2 shadow-sm">
+                  <X className="h-4 w-4 text-rose-600 stroke-[3]" />
+                  <span>Quotation Rejected • Commercial Concession Denied</span>
+                </div>
+              ) : (
+                <div className="h-9 px-4 rounded-md bg-slate-100 border border-slate-300 text-slate-700 text-xs font-semibold flex items-center gap-2">
+                  <span>Decision Recorded • No Action Required</span>
+                </div>
+              )}
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="flex items-center gap-3">
+              <div className="flex flex-col">
+                <span className="text-[11px] uppercase font-bold text-outline tracking-wider">
+                  Governance Action Required
+                </span>
+                <span className="text-sm font-bold text-on-surface">
+                  Quote #{quotationNumber} • {customerName} ({totalAmount})
+                </span>
+              </div>
+            </div>
 
-          {/* Return for Revision Button */}
-          <button
-            type="button"
-            onClick={() => setActiveModal("return")}
-            disabled={!canAct || isPending}
-            className="h-9 px-3.5 rounded-md border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900 text-xs font-semibold flex items-center gap-1.5 transition-colors disabled:opacity-50 cursor-pointer"
-          >
-            <RotateCcw className="h-3.5 w-3.5 text-amber-700" />
-            <span>Return for Revision</span>
-          </button>
+            <div className="flex items-center gap-2.5">
+              {/* Request More Info Button */}
+              <button
+                type="button"
+                onClick={() => setActiveModal("requestInfo")}
+                disabled={isPending}
+                className="h-9 px-3.5 rounded-md border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition-colors disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+              >
+                <HelpCircle className="h-3.5 w-3.5 text-slate-500" />
+                <span>Request Info</span>
+              </button>
 
-          {/* Reject Button */}
-          <button
-            type="button"
-            onClick={() => setActiveModal("reject")}
-            disabled={!canAct || isPending}
-            className="h-9 px-4 rounded-md border border-rose-300 bg-rose-50 hover:bg-rose-100 text-rose-800 text-xs font-semibold flex items-center gap-1.5 transition-colors disabled:opacity-50 cursor-pointer"
-          >
-            <X className="h-3.5 w-3.5 text-rose-700" />
-            <span>Reject</span>
-          </button>
+              {/* Return for Revision Button */}
+              <button
+                type="button"
+                onClick={() => setActiveModal("return")}
+                disabled={isPending}
+                className="h-9 px-3.5 rounded-md border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900 text-xs font-semibold flex items-center gap-1.5 transition-colors disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+              >
+                <RotateCcw className="h-3.5 w-3.5 text-amber-700" />
+                <span>Return for Revision</span>
+              </button>
 
-          {/* Approve Button */}
-          <button
-            type="button"
-            onClick={() => setActiveModal("approve")}
-            disabled={!canAct || isPending}
-            className="h-9 px-5 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition-colors disabled:opacity-50 cursor-pointer"
-          >
-            {isPending ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Check className="h-4 w-4 stroke-[3]" />
-            )}
-            <span>Approve Deal</span>
-          </button>
-        </div>
+              {/* Reject Button */}
+              <button
+                type="button"
+                onClick={() => setActiveModal("reject")}
+                disabled={isPending}
+                className="h-9 px-4 rounded-md border border-rose-300 bg-rose-50 hover:bg-rose-100 text-rose-800 text-xs font-semibold flex items-center gap-1.5 transition-colors disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+              >
+                <X className="h-3.5 w-3.5 text-rose-700" />
+                <span>Reject</span>
+              </button>
+
+              {/* Approve Button */}
+              <button
+                type="button"
+                onClick={() => setActiveModal("approve")}
+                disabled={isPending}
+                className="h-9 px-5 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition-colors disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+              >
+                {isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Check className="h-4 w-4 stroke-[3]" />
+                )}
+                <span>Approve Deal</span>
+              </button>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Confirmation & Comments Modal */}
