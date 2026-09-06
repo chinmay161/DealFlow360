@@ -106,7 +106,7 @@ export function QuotationForm() {
       newErrors.customer = "Please select an enterprise customer.";
     }
     if (lineItems.length === 0) {
-      newErrors.lineItems = "Please add at least one line item to the quotation.";
+      newErrors.lineItems = "Add at least one product before creating a quotation.";
     }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -198,6 +198,7 @@ export function QuotationForm() {
           marginPercent={marginPercent}
           estimatedRiskScore={estimatedRisk}
           isSubmitting={isSubmitting}
+          lineItemCount={lineItems.length}
           onSaveDraft={() => handleSubmit(false)}
           onSubmitForApproval={() => handleSubmit(true)}
         />

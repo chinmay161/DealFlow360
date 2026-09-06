@@ -10,6 +10,7 @@ interface QuoteActionBarProps {
   totalValue?: number;
   currency?: string;
   status?: string;
+  lineItemCount?: number;
   onOpenDecisionTrace?: () => void;
 }
 
@@ -18,6 +19,7 @@ export const QuoteActionBar: React.FC<QuoteActionBarProps> = ({
   totalValue = 1830000,
   currency = "INR",
   status,
+  lineItemCount,
   onOpenDecisionTrace,
 }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -27,8 +29,15 @@ export const QuoteActionBar: React.FC<QuoteActionBarProps> = ({
 
   const quotationId = quotation?.id;
   const currentStatus = quotation?.status || status;
+  const lineItemsLength = lineItemCount !== undefined ? lineItemCount : (quotation?.lineItems?.length ?? 0);
+  const hasLineItems = lineItemsLength > 0;
 
   const handleSaveDraft = async () => {
+    if (!hasLineItems) {
+      setFeedback("Add at least one product before creating a quotation.");
+      setTimeout(() => setFeedback(null), 4000);
+      return;
+    }
     if (!quotationId) {
       setFeedback("Draft saved to PostgreSQL database.");
       setTimeout(() => setFeedback(null), 3000);
@@ -40,9 +49,9 @@ export const QuoteActionBar: React.FC<QuoteActionBarProps> = ({
       await saveQuotationDraftAction(quotationId);
       setFeedback("Draft and decision trace saved successfully!");
       setTimeout(() => setFeedback(null), 3000);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to save draft:", err);
-      setFeedback("Failed to save draft.");
+      setFeedback(err?.message || "Failed to save draft.");
       setTimeout(() => setFeedback(null), 3000);
     } finally {
       setIsSaving(false);
@@ -50,6 +59,11 @@ export const QuoteActionBar: React.FC<QuoteActionBarProps> = ({
   };
 
   const handleSubmitForApproval = async () => {
+    if (!hasLineItems) {
+      setFeedback("Add at least one product before creating a quotation.");
+      setTimeout(() => setFeedback(null), 4000);
+      return;
+    }
     if (!quotationId || currentStatus === "IN_REVIEW") return;
     setIsSubmitting(true);
     try {
@@ -59,9 +73,9 @@ export const QuoteActionBar: React.FC<QuoteActionBarProps> = ({
       });
       setFeedback("Quotation successfully submitted for approval review!");
       setTimeout(() => setFeedback(null), 4000);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to submit quotation:", err);
-      setFeedback("Failed to submit quotation.");
+      setFeedback(err?.message || "Failed to submit quotation.");
       setTimeout(() => setFeedback(null), 4000);
     } finally {
       setIsSubmitting(false);
@@ -78,9 +92,10 @@ export const QuoteActionBar: React.FC<QuoteActionBarProps> = ({
         <div className="flex items-center gap-2.5">
           <button
             type="button"
-            disabled={isSaving}
+            disabled={isSaving || !hasLineItems}
             onClick={handleSaveDraft}
-            className="h-9 px-4 rounded-md bg-white border border-[#D1D5DB] text-on-surface hover:bg-[#F9FAFB] hover:border-[#9CA3AF] font-label-md text-label-md font-semibold flex items-center gap-1.5 transition-colors shadow-sm disabled:opacity-50"
+            title={!hasLineItems ? "Add at least one product before creating a quotation." : undefined}
+            className="h-9 px-4 rounded-md bg-white border border-[#D1D5DB] text-on-surface hover:bg-[#F9FAFB] hover:border-[#9CA3AF] font-label-md text-label-md font-semibold flex items-center gap-1.5 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <span className="material-symbols-outlined text-sm text-outline" data-icon="save">
               save
@@ -117,6 +132,16 @@ export const QuoteActionBar: React.FC<QuoteActionBarProps> = ({
           )}
         </div>
 
+        {/* Center Validation Message if zero line items */}
+        {!hasLineItems && (
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-amber-50 border border-amber-300 text-amber-800 text-xs font-semibold animate-pulse">
+            <span className="material-symbols-outlined text-sm text-amber-600" data-icon="warning">
+              warning
+            </span>
+            <span>Add at least one product before creating a quotation.</span>
+          </div>
+        )}
+
         {/* Right Action */}
         <div className="flex items-center gap-3">
           <div className="text-right hidden sm:block">
@@ -130,10 +155,13 @@ export const QuoteActionBar: React.FC<QuoteActionBarProps> = ({
 
           <button
             type="button"
-            disabled={isSubmitting || isUnderReview || isApproved}
+            disabled={isSubmitting || isUnderReview || isApproved || !hasLineItems}
             onClick={handleSubmitForApproval}
+            title={!hasLineItems ? "Add at least one product before creating a quotation." : undefined}
             className={`h-10 px-5 rounded-md font-title-md text-body-md font-semibold flex items-center justify-center gap-2 shadow-sm transition-colors duration-150 ${
-              isUnderReview
+              !hasLineItems
+                ? "bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed"
+                : isUnderReview
                 ? "bg-[#FFFBEB] text-[#92400E] border border-[#FDE68A] cursor-default"
                 : isApproved
                 ? "bg-[#ECFDF5] text-[#065F46] border border-[#A7F3D0] cursor-default"
@@ -141,7 +169,9 @@ export const QuoteActionBar: React.FC<QuoteActionBarProps> = ({
             }`}
           >
             <span>
-              {isUnderReview
+              {!hasLineItems
+                ? "Submit for Approval"
+                : isUnderReview
                 ? "Under Approval Review"
                 : isApproved
                 ? "Quotation Approved"
@@ -149,8 +179,8 @@ export const QuoteActionBar: React.FC<QuoteActionBarProps> = ({
                 ? "Submitting..."
                 : "Submit for Approval"}
             </span>
-            <span className="material-symbols-outlined text-base" data-icon={isUnderReview ? "pending" : isApproved ? "check_circle" : "send"}>
-              {isUnderReview ? "pending" : isApproved ? "check_circle" : "send"}
+            <span className="material-symbols-outlined text-base" data-icon={!hasLineItems ? "block" : isUnderReview ? "pending" : isApproved ? "check_circle" : "send"}>
+              {!hasLineItems ? "block" : isUnderReview ? "pending" : isApproved ? "check_circle" : "send"}
             </span>
           </button>
         </div>

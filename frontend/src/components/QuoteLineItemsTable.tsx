@@ -327,8 +327,20 @@ export const QuoteLineItemsTable: React.FC<QuoteLineItemsTableProps> = ({
             <tbody className="divide-y divide-[#F1F5F9] font-body-md text-body-md">
               {items.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="py-8 text-center text-outline text-body-md">
-                    No line items configured for this quotation.
+                  <td colSpan={9} className="py-10 text-center">
+                    <div className="flex flex-col items-center justify-center gap-2 max-w-md mx-auto">
+                      <div className="w-10 h-10 rounded-full bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600">
+                        <span className="material-symbols-outlined text-xl" data-icon="warning">
+                          warning
+                        </span>
+                      </div>
+                      <p className="font-semibold text-slate-800 text-sm">
+                        Add at least one product before creating a quotation.
+                      </p>
+                      <p className="text-xs text-slate-500">
+                        A quotation must contain at least one product. Empty quotations are invalid and cannot be saved or submitted.
+                      </p>
+                    </div>
                   </td>
                 </tr>
               ) : (

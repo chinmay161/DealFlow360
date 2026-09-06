@@ -14,6 +14,7 @@ interface FinancialSummarySidebarProps {
   marginPercent: number;
   estimatedRiskScore: number;
   isSubmitting?: boolean;
+  lineItemCount?: number;
   onSaveDraft: () => void;
   onSubmitForApproval: () => void;
 }
@@ -26,11 +27,13 @@ export function FinancialSummarySidebar({
   marginPercent,
   estimatedRiskScore,
   isSubmitting = false,
+  lineItemCount,
   onSaveDraft,
   onSubmitForApproval,
 }: FinancialSummarySidebarProps) {
   const isHealthyMargin = marginPercent >= 25;
   const isLowRisk = estimatedRiskScore <= 30;
+  const hasLineItems = lineItemCount !== undefined ? lineItemCount > 0 : true;
 
   return (
     <Card className="rounded-xl border border-slate-200/80 bg-white shadow-sm sticky top-20">
@@ -101,13 +104,23 @@ export function FinancialSummarySidebar({
           </div>
         </div>
 
+        {/* Validation Warning for Zero Line Items */}
+        {!hasLineItems && (
+          <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-300 flex items-start gap-2 text-xs text-amber-800 font-medium">
+            <AlertCircle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+            <span>Add at least one product before creating a quotation.</span>
+          </div>
+        )}
+
         {/* Action Buttons */}
         <div className="pt-2 space-y-2">
           <Button
             type="button"
             variant="primary"
-            className="w-full h-10 text-xs font-semibold"
+            className="w-full h-10 text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
             isLoading={isSubmitting}
+            disabled={isSubmitting || !hasLineItems}
+            title={!hasLineItems ? "Add at least one product before creating a quotation." : undefined}
             onClick={onSubmitForApproval}
           >
             <Send className="h-3.5 w-3.5 mr-1.5" />
@@ -117,8 +130,9 @@ export function FinancialSummarySidebar({
           <Button
             type="button"
             variant="outline"
-            className="w-full h-9 text-xs font-semibold"
-            disabled={isSubmitting}
+            className="w-full h-9 text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={isSubmitting || !hasLineItems}
+            title={!hasLineItems ? "Add at least one product before creating a quotation." : undefined}
             onClick={onSaveDraft}
           >
             <FileDown className="h-3.5 w-3.5 mr-1.5 text-slate-500" />
