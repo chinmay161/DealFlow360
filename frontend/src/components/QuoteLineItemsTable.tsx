@@ -38,6 +38,7 @@ interface ProductOption {
   costPrice: number;
   taxRate: number;
   totalStock: number;
+  isDigital?: boolean;
 }
 
 function formatPercent(value: number | null | undefined): string {
@@ -353,12 +354,27 @@ export const QuoteLineItemsTable: React.FC<QuoteLineItemsTableProps> = ({
                   const marginAmount = item.lineTotal * (marginPercent / 100);
                   const isEditing = editingItemId === item.id;
 
+                  const isServiceOrDigital = Boolean(
+                    item.sku?.startsWith("SRV-") ||
+                    item.sku?.startsWith("SW-") ||
+                    item.sku?.startsWith("SVC-") ||
+                    item.sku?.startsWith("SEC-AUDIT") ||
+                    item.productName?.toLowerCase().includes("support") ||
+                    item.productName?.toLowerCase().includes("subscription") ||
+                    item.productName?.toLowerCase().includes("license") ||
+                    item.productName?.toLowerCase().includes("advisory") ||
+                    item.productName?.toLowerCase().includes("training") ||
+                    item.productName?.toLowerCase().includes("migration")
+                  );
+
                   const stock = (item.sku && stockDataMap[item.sku]) || stockDataMap[item.productName];
-                  const primaryWh = stock?.warehouseAllocations?.[0]?.warehouseName || "Mumbai Central Hub";
-                  const avail = stock?.availableQty ?? (item.quantity + 45);
-                  const res = stock?.reservedQty ?? 15;
-                  const freeStock = stock?.freeStock ?? Math.max(0, avail - res);
-                  const isDeficit = item.quantity > freeStock;
+                  const primaryWh = isServiceOrDigital
+                    ? "Cloud & Digital Hub"
+                    : stock?.warehouseAllocations?.[0]?.warehouseName || "Mumbai Central Hub";
+                  const avail = isServiceOrDigital ? 9999 : (stock?.availableQty ?? (item.quantity + 45));
+                  const res = isServiceOrDigital ? 0 : (stock?.reservedQty ?? 15);
+                  const freeStock = isServiceOrDigital ? 9999 : (stock?.freeStock ?? Math.max(0, avail - res));
+                  const isDeficit = !isServiceOrDigital && (item.quantity > freeStock);
 
                   return (
                     <React.Fragment key={item.id}>
@@ -393,28 +409,40 @@ export const QuoteLineItemsTable: React.FC<QuoteLineItemsTableProps> = ({
                             Warehouse: <strong className="text-on-surface font-semibold">{primaryWh}</strong>
                           </span>
                           <span className="text-outline">•</span>
-                          <span className="text-outline">
-                            Avail: <strong className="text-on-surface font-mono">{avail}</strong>
-                          </span>
-                          <span className="text-outline">•</span>
-                          <span className="text-outline">
-                            Rsvd: <strong className="text-amber-700 font-mono">{res}</strong>
-                          </span>
-                          <span className="text-outline">•</span>
-                          <span className="text-emerald-700 font-semibold">
-                            Free: <strong className="font-mono">{freeStock}</strong>
-                          </span>
-                          <StockIndicator freeStock={freeStock} showCount={false} />
-                          <button
-                            type="button"
-                            onClick={() => setExpandedInventoryItemId(expandedInventoryItemId === item.id ? null : item.id)}
-                            className="text-primary hover:underline text-[10px] font-semibold ml-1 inline-flex items-center gap-0.5"
-                          >
-                            <span>{expandedInventoryItemId === item.id ? "Hide Hubs" : "Hub Breakdown"}</span>
-                            <span className={`material-symbols-outlined text-[11px] transition-transform ${expandedInventoryItemId === item.id ? "rotate-180" : ""}`}>
-                              expand_more
-                            </span>
-                          </button>
+                          {isServiceOrDigital ? (
+                            <>
+                              <span className="text-emerald-700 font-semibold">
+                                Delivery: <strong className="font-sans">Instant Provisioning</strong>
+                              </span>
+                              <span className="text-outline">•</span>
+                              <StockIndicator freeStock={9999} showCount={false} />
+                            </>
+                          ) : (
+                            <>
+                              <span className="text-outline">
+                                Avail: <strong className="text-on-surface font-mono">{avail}</strong>
+                              </span>
+                              <span className="text-outline">•</span>
+                              <span className="text-outline">
+                                Rsvd: <strong className="text-amber-700 font-mono">{res}</strong>
+                              </span>
+                              <span className="text-outline">•</span>
+                              <span className="text-emerald-700 font-semibold">
+                                Free: <strong className="font-mono">{freeStock}</strong>
+                              </span>
+                              <StockIndicator freeStock={freeStock} showCount={false} />
+                              <button
+                                type="button"
+                                onClick={() => setExpandedInventoryItemId(expandedInventoryItemId === item.id ? null : item.id)}
+                                className="text-primary hover:underline text-[10px] font-semibold ml-1 inline-flex items-center gap-0.5"
+                              >
+                                <span>{expandedInventoryItemId === item.id ? "Hide Hubs" : "Hub Breakdown"}</span>
+                                <span className={`material-symbols-outlined text-[11px] transition-transform ${expandedInventoryItemId === item.id ? "rotate-180" : ""}`}>
+                                  expand_more
+                                </span>
+                              </button>
+                            </>
+                          )}
                         </div>
 
                         {/* Non-blocking low stock warning banner */}
@@ -776,7 +804,7 @@ export const QuoteLineItemsTable: React.FC<QuoteLineItemsTableProps> = ({
                           </span>
                         </div>
                         <div className="font-body-sm text-[11px] text-outline mt-0.5">
-                          {p.categoryName} • Stock: {p.totalStock} units available across hubs
+                          {p.categoryName} • {p.isDigital ? "Digital Provisioning • Instant Delivery" : `Stock: ${p.totalStock} units available across hubs`}
                         </div>
                       </div>
                       <div className="text-right">
@@ -796,10 +824,19 @@ export const QuoteLineItemsTable: React.FC<QuoteLineItemsTableProps> = ({
             {/* Selected Product Configuration & Real-Time Inventory Visibility */}
             {selectedProductId && (() => {
               const sp = products.find((p) => p.id === selectedProductId);
-              const totalAvail = sp?.totalStock || 50;
-              const resCount = 10;
-              const free = Math.max(0, totalAvail - resCount);
-              const isShort = newQuantity > free;
+              const isDigital = Boolean(
+                sp?.isDigital ||
+                sp?.sku?.startsWith("SW-") ||
+                sp?.sku?.startsWith("SRV-") ||
+                sp?.sku?.startsWith("SVC-") ||
+                sp?.sku?.startsWith("SEC-AUDIT") ||
+                ["Software", "Services", "Cloud", "Support", "Subscription"].includes(sp?.categoryName || "")
+              );
+
+              const totalAvail = isDigital ? 9999 : (sp?.totalStock ?? 0);
+              const resCount = isDigital ? 0 : Math.min(10, Math.floor(totalAvail * 0.1));
+              const free = isDigital ? 9999 : Math.max(0, totalAvail - resCount);
+              const isShort = !isDigital && newQuantity > free;
               const selUnitPrice = sp ? convertFromINR(sp.unitPrice, currency) : 0;
               const previewTotal = newQuantity * selUnitPrice * (1 - newDiscount / 100);
 
@@ -809,14 +846,14 @@ export const QuoteLineItemsTable: React.FC<QuoteLineItemsTableProps> = ({
                   <div className="space-y-2">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <ReservationPreview
-                        warehouseName="Mumbai Central Hub"
+                        warehouseName={isDigital ? "Cloud & Digital Fulfillment" : "Mumbai Central Hub"}
                         willReserve={newQuantity}
                         currentAvailable={totalAvail}
                         currentReserved={resCount}
                       />
                       <ShipmentReadiness
                         isReady={!isShort}
-                        estimatedDispatch={!isShort ? "Today" : "3-5 Business Days (Replenishment)"}
+                        estimatedDispatch={isDigital ? "Instant Provisioning" : (!isShort ? "Today" : "3-5 Business Days (Replenishment)")}
                         reason={isShort ? `Requested ${newQuantity} units exceeds current free stock (${free} units).` : undefined}
                       />
                     </div>

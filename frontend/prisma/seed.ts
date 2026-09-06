@@ -1098,21 +1098,39 @@ async function main() {
   const inventoryData = [
     // Mumbai Enterprise Hub
     { warehouseId: "wh-001-ind-west", sku: "HW-LP14", onHand: 500, reserved: 50, available: 450, reorder: 50 },
+    { warehouseId: "wh-001-ind-west", sku: "HW-LP16", onHand: 350, reserved: 35, available: 315, reorder: 40 },
     { warehouseId: "wh-001-ind-west", sku: "DSP27", onHand: 15, reserved: 3, available: 12, reorder: 20 },
+    { warehouseId: "wh-001-ind-west", sku: "HW-DSP34", onHand: 80, reserved: 8, available: 72, reorder: 15 },
     { warehouseId: "wh-001-ind-west", sku: "ACC-TB4-DK", onHand: 240, reserved: 20, available: 220, reorder: 30 },
     { warehouseId: "wh-001-ind-west", sku: "PWR-100W-2C", onHand: 850, reserved: 50, available: 800, reorder: 100 },
     { warehouseId: "wh-001-ind-west", sku: "HW-WS-Z8", onHand: 40, reserved: 5, available: 35, reorder: 10 },
+    { warehouseId: "wh-001-ind-west", sku: "HW-SRV-R750", onHand: 25, reserved: 3, available: 22, reorder: 5 },
+    { warehouseId: "wh-001-ind-west", sku: "ACC-KB-MS-PRO", onHand: 500, reserved: 40, available: 460, reorder: 50 },
+    { warehouseId: "wh-001-ind-west", sku: "ACC-CBL-TB4", onHand: 800, reserved: 50, available: 750, reorder: 100 },
+    { warehouseId: "wh-001-ind-west", sku: "SEC-FIDO2-KEY", onHand: 300, reserved: 20, available: 280, reorder: 30 },
     // Bengaluru Technology Hub
     { warehouseId: "wh-002-ind-south", sku: "HW-LP14", onHand: 0, reserved: 0, available: 0, reorder: 50 }, // Intentionally 0
+    { warehouseId: "wh-002-ind-south", sku: "HW-LP16", onHand: 200, reserved: 20, available: 180, reorder: 30 },
     { warehouseId: "wh-002-ind-south", sku: "DSP27", onHand: 350, reserved: 30, available: 320, reorder: 40 },
+    { warehouseId: "wh-002-ind-south", sku: "HW-DSP34", onHand: 150, reserved: 15, available: 135, reorder: 25 },
     { warehouseId: "wh-002-ind-south", sku: "ACC-TB4-DK", onHand: 200, reserved: 20, available: 180, reorder: 30 },
     { warehouseId: "wh-002-ind-south", sku: "PWR-100W-2C", onHand: 650, reserved: 50, available: 600, reorder: 100 },
     { warehouseId: "wh-002-ind-south", sku: "HW-WS-Z8", onHand: 45, reserved: 5, available: 40, reorder: 10 },
+    { warehouseId: "wh-002-ind-south", sku: "HW-SRV-R750", onHand: 30, reserved: 4, available: 26, reorder: 5 },
+    { warehouseId: "wh-002-ind-south", sku: "ACC-KB-MS-PRO", onHand: 450, reserved: 30, available: 420, reorder: 50 },
+    { warehouseId: "wh-002-ind-south", sku: "ACC-CBL-TB4", onHand: 600, reserved: 40, available: 560, reorder: 80 },
+    { warehouseId: "wh-002-ind-south", sku: "SEC-FIDO2-KEY", onHand: 250, reserved: 15, available: 235, reorder: 30 },
     // Delhi NCR Fulfillment Centre
     { warehouseId: "wh-003-ind-north", sku: "HW-LP14", onHand: 180, reserved: 20, available: 160, reorder: 30 },
+    { warehouseId: "wh-003-ind-north", sku: "HW-LP16", onHand: 120, reserved: 15, available: 105, reorder: 20 },
     { warehouseId: "wh-003-ind-north", sku: "DSP27", onHand: 90, reserved: 10, available: 80, reorder: 15 },
+    { warehouseId: "wh-003-ind-north", sku: "HW-DSP34", onHand: 60, reserved: 5, available: 55, reorder: 10 },
     { warehouseId: "wh-003-ind-north", sku: "ACC-TB4-DK", onHand: 110, reserved: 15, available: 95, reorder: 20 },
     { warehouseId: "wh-003-ind-north", sku: "HW-WS-Z8", onHand: 20, reserved: 5, available: 15, reorder: 5 },
+    { warehouseId: "wh-003-ind-north", sku: "HW-SRV-R750", onHand: 15, reserved: 2, available: 13, reorder: 5 },
+    { warehouseId: "wh-003-ind-north", sku: "ACC-KB-MS-PRO", onHand: 250, reserved: 20, available: 230, reorder: 30 },
+    { warehouseId: "wh-003-ind-north", sku: "ACC-CBL-TB4", onHand: 350, reserved: 25, available: 325, reorder: 50 },
+    { warehouseId: "wh-003-ind-north", sku: "SEC-FIDO2-KEY", onHand: 150, reserved: 10, available: 140, reorder: 20 },
   ];
 
   for (const inv of inventoryData) {

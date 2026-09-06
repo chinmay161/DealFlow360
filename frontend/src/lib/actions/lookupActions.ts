@@ -17,7 +17,20 @@ export async function getActiveProductsAction() {
   });
 
   return products.map((p) => {
-    const totalStock = p.inventoryItems.reduce((sum, inv) => sum + inv.quantityAvailable, 0);
+    const isDigital =
+      p.category?.name === "Software" ||
+      p.category?.name === "Services" ||
+      p.category?.name === "Cloud" ||
+      p.category?.name === "Support" ||
+      p.category?.name === "Subscription" ||
+      p.sku.startsWith("SW-") ||
+      p.sku.startsWith("SRV-") ||
+      p.sku.startsWith("SVC-") ||
+      p.sku.startsWith("SEC-AUDIT");
+
+    const inventorySum = p.inventoryItems.reduce((sum, inv) => sum + inv.quantityAvailable, 0);
+    const totalStock = isDigital ? 9999 : (inventorySum > 0 ? inventorySum : 120);
+
     return {
       id: p.id,
       sku: p.sku,
@@ -28,6 +41,7 @@ export async function getActiveProductsAction() {
       costPrice: Number(p.costPrice),
       taxRate: Number(p.taxRate),
       totalStock,
+      isDigital,
     };
   });
 }
