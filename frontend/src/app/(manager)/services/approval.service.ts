@@ -54,9 +54,9 @@ export const managerApprovalService = {
    * Request more information from sales executive
    */
   async requestMoreInfo(approvalId: string, query: string): Promise<{ success: boolean; message?: string }> {
-    return apiClient<{ success: boolean; message?: string }>(`/api/approvals/${encodeURIComponent(approvalId)}/return`, {
+    return apiClient<{ success: boolean; message?: string }>(`/api/approvals/${encodeURIComponent(approvalId)}/request-info`, {
       method: "POST",
-      body: JSON.stringify({ comments: `[Information Requested]: ${query}` }),
+      body: JSON.stringify({ query }),
     });
   },
 };
